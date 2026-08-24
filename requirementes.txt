@@ -1,1 +1,7 @@
-streamlit, pandas, fpdf, Pillow, supabase, pytesseract
+streamlit
+pandas
+openpyxl
+fpdf
+Pillow
+supabase
+pytesseract
