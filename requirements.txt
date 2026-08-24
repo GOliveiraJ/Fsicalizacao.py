@@ -1,7 +1,7 @@
 streamlit
 pandas
 openpyxl
-FPDF
+fpdf
 Pillow
 supabase
 pytesseract
