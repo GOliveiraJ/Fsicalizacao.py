@@ -24,7 +24,7 @@ O projeto resolve o desafio do preenchimento manual de relatórios em campo, eli
 ## ⚙️ Como Configurar e Executar
 
 1. Clone o repositório e acesse a pasta do projeto:
-   git clone [https://github.com/seu-usuario/nome-do-repositorio.git](https://github.com/seu-usuario/nome-do-repositorio.git)
+   git clone [https://github.com/seu-usuario/nome-do-repositorio.git](https://github.com/GOliveiraJ/Fsicalizacao.py.git)
    cd nome-do-repositorio
 
    Crie um ambiente virtual e instale as dependências:
