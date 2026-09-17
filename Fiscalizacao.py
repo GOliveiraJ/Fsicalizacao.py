@@ -25,7 +25,7 @@ except ImportError:
 st.set_page_config(page_title="GGTAB/ANVISA - Fiscalização", page_icon="🚭", layout="wide")
 
 # ==========================================
-# CONEXÃO SUPABASE & AUDITORIA COM DETECTOR DE ERRO
+# CONEXÃO SUPABASE & AUDITORIA
 # ==========================================
 @st.cache_resource
 def init_supabase():
@@ -48,10 +48,8 @@ def registrar_log(acao, detalhes):
                 "acao": acao,
                 "detalhes": detalhes
             }).execute()
-            # Limpa qualquer erro antigo se der certo
             if 'log_error' in st.session_state: del st.session_state['log_error']
         except Exception as e:
-            # Captura o erro silencioso do Supabase para mostrar na tela de Monitoramento
             st.session_state['log_error'] = str(e)
 
 # ==========================================
@@ -509,18 +507,22 @@ DB_PRODUTOS_BASE = {
     }
 }
 
-# Mescla os produtos base com os novos cadastrados na Nuvem
+# ==========================================
+# INTEGRAÇÃO INTELIGENTE (FUSÃO DE NUVEM)
+# ==========================================
 def obter_banco_atualizado():
     banco_dinamico = copy.deepcopy(DB_PRODUTOS_BASE)
     if supabase_client:
         try:
             resp = supabase_client.table('produtos_customizados').select('*').execute()
             for row in resp.data:
-                cat, tipo, prod, cnpj = row['categoria'], row['tipo'], row['produto'], row['cnpj']
+                cat, tipo, prod, cnpj, status = row['categoria'], row['tipo'], row['produto'], row['cnpj'], row['status']
                 if cat in banco_dinamico:
                     if tipo not in banco_dinamico[cat]:
                         banco_dinamico[cat][tipo] = {}
-                    banco_dinamico[cat][tipo][prod] = cnpj
+                    # Marca oculta para o filtro inteligente do app saber o que é Ilegal
+                    val_final = cnpj if "Ilegal" not in status else f"{cnpj} [Ilegal]"
+                    banco_dinamico[cat][tipo][prod] = val_final
         except Exception: pass
     return banco_dinamico
 
@@ -536,7 +538,7 @@ def salvar_produto_nuvem(categoria, tipo, produto, cnpj, status):
                     "cnpj": cnpj,
                     "status": status
                 }).execute()
-                registrar_log("Novo Produto Cadastrado", f"O produto '{produto}' ({status}) foi adicionado à base.")
+                registrar_log("Novo Produto Ilegal", f"A marca '{produto}' foi salva para futuras fiscalizações.")
         except Exception: pass
 
 DB_PRODUTOS = obter_banco_atualizado()
@@ -552,7 +554,7 @@ def get_cnpj_mapping():
 CNPJ_TO_PRODUTO = get_cnpj_mapping()
 
 # ==========================================
-# FUNÇÕES CORE (PDF, EXCEL, OCR)
+# RDC E PDF CORE
 # ==========================================
 def clean_text_for_pdf(text):
     if not text: return text
@@ -571,13 +573,13 @@ def ler_cnpj_imagem(imagem_bytes):
 
 def obter_fundamentacao_legal(categoria, status):
     if "Propaganda" in categoria or "Propaganda" in status: 
-        return "RDC no 840/2023 e Lei 9.294/96 (Propaganda Irregular)"
+        return "RDC nº 840/2023 e Lei 9.294/96 (Propaganda Irregular de Produto Registrado)"
     elif "DEF" in categoria: 
-        return "RDC no 855/2024 e Lei 6.437/77 (Comercializacao de DEF)"
-    elif "Ilegal" in status or "Nao Registrado" in status: 
-        return "RDC no 896/2024 e Lei 6.437/77 (Produto Fumeiro Sem Registro)"
+        return "RDC nº 855/2024 e Lei 6.437/77 (Comercializacao de DEF)"
+    elif "Ilegal" in status or "Apreensão" in categoria: 
+        return "RDC nº 896/2024 e Lei 6.437/77 (Produto Fumeiro Sem Registro / Ilegal)"
     else: 
-        return "Amostragem / RDC no 838/2023 (Fiscalizacao de Embalagem)"
+        return "Amostragem / RDC nº 838/2023 (Fiscalizacao de Embalagem)"
 
 def gerar_excel(fisc):
     flat_data = []
@@ -629,14 +631,14 @@ def gerar_pdf(fisc):
                 pdf.set_font("helvetica", size=10)
                 pdf.cell(0, 6, clean_text_for_pdf(f"Categoria: {item['Categoria']} | Tipo: {item['Tipo']}"), ln=True)
                 qtd_str = f"Qtd: {item['Quantidade']} und. | Status: {item['Status']}"
-                if "Propaganda" in item['Categoria']: qtd_str = f"Peças Publicitárias: {item['Quantidade']} | Status: {item['Status']}"
+                if "Propaganda" in item['Categoria'] or "Propaganda" in item['Status']: qtd_str = f"Peças Publicitárias: {item['Quantidade']} | Status: {item['Status']}"
                 pdf.cell(0, 6, clean_text_for_pdf(qtd_str), ln=True)
                 pdf.set_font("helvetica", style="B", size=10)
-                pdf.cell(0, 6, clean_text_for_pdf(f"CNPJ Identificado: {item['CNPJ Identificado']}"), ln=True)
+                pdf.cell(0, 6, clean_text_for_pdf(f"CNPJ / Lote: {item['CNPJ Identificado'].replace(' [Ilegal]', '')}"), ln=True)
                 fund = obter_fundamentacao_legal(item['Categoria'], item['Status'])
                 pdf.set_font("helvetica", style="I", size=9)
                 pdf.set_text_color(200, 0, 0) if "Ilegal" in item['Status'] or "Propaganda" in item['Status'] else pdf.set_text_color(0, 100, 0)
-                pdf.cell(0, 6, clean_text_for_pdf(f"Fundamentacao: {fund}"), ln=True)
+                pdf.cell(0, 6, clean_text_for_pdf(f"Fundamentacao Legal: {fund}"), ln=True)
                 pdf.set_text_color(0, 0, 0) 
                 
                 foto1, foto2 = item.get('Foto 1 Bytes'), item.get('Foto 2 Bytes')
@@ -663,7 +665,6 @@ if 'nome_fiscal' not in st.session_state: st.session_state['nome_fiscal'] = ""
 if 'historico_operacoes' not in st.session_state: st.session_state['historico_operacoes'] = []
 if 'fisc_ativa' not in st.session_state: st.session_state['fisc_ativa'] = None
 if 'loja_ativa' not in st.session_state: st.session_state['loja_ativa'] = None
-if 'modo_daltonismo' not in st.session_state: st.session_state['modo_daltonismo'] = False
 
 def tela_login():
     st.title("🚭 Portal de Fiscalização - GGTAB/CCTAB")
@@ -727,20 +728,20 @@ def app():
         total_ops = len(todas_operacoes)
         total_lojas = sum(len(op['lojas']) for op in todas_operacoes)
         total_produtos = sum(item['Quantidade'] for op in todas_operacoes for l in op['lojas'] for item in l['itens'])
-        total_ilegais = sum(item['Quantidade'] for op in todas_operacoes for l in op['lojas'] for item in l['itens'] if "Ilegal" in item['Status'] or "Prop" in item['Status'] or "Propaganda" in item['Categoria'])
+        total_ilegais = sum(item['Quantidade'] for op in todas_operacoes for l in op['lojas'] for item in l['itens'] if "Ilegal" in item['Status'] or "Propaganda" in item['Status'])
         
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Operações", total_ops)
         c2.metric("Lojas Auditadas", total_lojas)
         c3.metric("Itens Totais", total_produtos)
-        c4.metric("Itens Ilegais / Propagandas", total_ilegais, delta="Atenção", delta_color="inverse")
+        c4.metric("Infrações (Ilegais/Propaganda)", total_ilegais, delta="Atenção", delta_color="inverse")
         st.markdown("---")
         st.info("O sistema está sincronizado com o banco de dados oficial e customizado da nuvem.")
 
     # --- TELA 2: CONSULTA E CADASTRO ---
     elif menu == "🔍 Consulta e Cadastro":
         st.title("🗃️ Gestão de Produtos (Base ANVISA + Customizada)")
-        aba_consulta, aba_cadastro = st.tabs(["🔍 Consultar Existentes", "➕ Cadastrar Novo Produto"])
+        aba_consulta, aba_cadastro = st.tabs(["🔍 Consultar Existentes", "➕ Cadastrar Nova Marca Ilegal"])
         
         with aba_consulta:
             termo = st.text_input("Digite a marca, tipo ou CNPJ para buscar:").lower()
@@ -750,17 +751,17 @@ def app():
                     for tipo, produtos in tipos.items():
                         for prod, cnpj in produtos.items():
                             if termo in prod.lower() or termo in cnpj.lower() or termo in tipo.lower():
-                                status_base = "✅ Regular" if "Ilegal" not in cnpj else "❌ Ilegal (DEF)"
-                                resultados.append({"Categoria": cat, "Tipo": tipo, "Produto": prod, "CNPJ": cnpj, "Status": status_base})
+                                status_base = "✅ Regular" if "Ilegal" not in cnpj else "❌ Ilegal (Apreensão)"
+                                resultados.append({"Categoria": cat, "Tipo": tipo, "Produto": prod, "CNPJ": cnpj.replace(" [Ilegal]", ""), "Status": status_base})
                 if resultados:
                     st.dataframe(pd.DataFrame(resultados), use_container_width=True)
                 else: st.warning("Produto não encontrado na base unificada.")
                 
         with aba_cadastro:
-            st.markdown("Cadastre permanentemente um novo produto (Regular recém-aprovado ou nova marca Ilegal) para que todos os fiscais possam utilizá-lo.")
+            st.markdown("Cadastre permanentemente um **novo produto ILEGAL (sem registro)** para que todos os fiscais possam apreendê-lo nas próximas operações.")
             with st.form("form_cadastro_produto"):
                 c1, c2 = st.columns(2)
-                cat_cad = c1.selectbox("Categoria Macro", ["Selecione..."] + list(DB_PRODUTOS.keys()))
+                cat_cad = c1.selectbox("Categoria Macro", ["Selecione...", "💨 DEF (Dispositivos Eletrônicos para Fumar)", "🍂 TABACOS E DERIVADOS"])
                 
                 if cat_cad != "Selecione...":
                     tipos_existentes = list(DB_PRODUTOS[cat_cad].keys()) + ["+ Criar Novo Tipo"]
@@ -770,15 +771,15 @@ def app():
                 else:
                     tipo_cad = c2.selectbox("Tipo de Produto", ["Aguardando Categoria..."])
 
-                c3, c4, c5 = st.columns([2, 1, 1])
-                prod_cad = c3.text_input("Nome Comercial da Marca/Produto")
-                cnpj_cad = c4.text_input("CNPJ (Se houver)")
-                status_cad = c5.selectbox("Status Fixo", ["Ilegal / Não Registrado", "✅ Regular (Registrado)"])
+                c3, c4 = st.columns([2, 1])
+                prod_cad = c3.text_input("Nome Comercial da Marca Ilegal/Produto")
+                cnpj_cad = c4.text_input("CNPJ Falso/Inexistente (Se houver)")
+                status_cad = "Ilegal/Apreensão"
                 
-                if st.form_submit_button("Salvar no Banco de Dados Global", type="primary"):
+                if st.form_submit_button("Salvar Ilegal no Banco Global", type="primary"):
                     if cat_cad != "Selecione..." and tipo_cad != "Aguardando Categoria..." and prod_cad and tipo_cad:
-                        salvar_produto_nuvem(cat_cad, tipo_cad, prod_cad, cnpj_cad if cnpj_cad else "Não Informado", status_cad)
-                        st.success(f"'{prod_cad}' adicionado ao banco com sucesso! Ele já aparecerá nas próximas fiscalizações.")
+                        salvar_produto_nuvem(cat_cad, tipo_cad, prod_cad, cnpj_cad if cnpj_cad else "Sem CNPJ", status_cad)
+                        st.success(f"A marca '{prod_cad}' foi adicionada à Nuvem como ILEGAL com sucesso!")
                     else: st.error("Preencha corretamente a Categoria, o Tipo e o Nome do produto.")
 
     # --- TELA 3: NOVA FISCALIZAÇÃO ---
@@ -801,7 +802,7 @@ def app():
                 c1, c2 = st.columns([1, 3])
                 n_loja = c1.number_input("Nº da Loja", min_value=1)
                 nome_loja = c2.text_input("Endereço/Nome Fantasia")
-                if st.form_submit_button("Iniciar Auditoria"):
+                if st.form_submit_button("Iniciar Auditoria na Loja"):
                     if nome_loja.strip():
                         st.session_state['loja_ativa'] = {"numero": n_loja, "nome": nome_loja, "itens": []}
                         st.rerun()
@@ -821,11 +822,11 @@ def app():
                                     "loja": f"Loja {loja['numero']} - {loja['nome']}",
                                     "categoria": it['Categoria'], "tipo": it['Tipo'],
                                     "produto": it['Produto'], "status": it['Status'],
-                                    "cnpj": it['CNPJ Identificado'], "quantidade": it['Quantidade']
+                                    "cnpj": it['CNPJ Identificado'].replace(" [Ilegal]", ""), "quantidade": it['Quantidade']
                                 })
                         if dados:
                             supabase_client.table("apreensoes").insert(dados).execute()
-                            registrar_log("Operação Finalizada", f"Salvou {len(dados)} itens da {fisc_atual['operacao_id']} na nuvem.")
+                            registrar_log("Operação Finalizada", f"Salvou {len(dados)} infrações da {fisc_atual['operacao_id']} na nuvem.")
                     
                     st.session_state['historico_operacoes'].append(fisc_atual)
                     st.session_state['fisc_ativa'] = None
@@ -836,35 +837,53 @@ def app():
         loja = st.session_state['loja_ativa']
         st.subheader(f"🏬 Loja {loja['numero']} - {loja['nome']}")
         
-        with st.expander("📦 ADICIONAR ITEM À LOJA", expanded=True):
-            # NOVO MENU MACRO COM PROPAGANDA INTEGRADA AOS TABACOS REGISTRADOS
-            cat_macro = st.selectbox("Categoria Macro", [
+        with st.expander("📦 ADICIONAR INFRAÇÃO À LOJA", expanded=True):
+            # O FILTRO INTELIGENTE
+            cat_macro = st.selectbox("Categoria Macro da Infração", [
                 "Selecione...", 
                 "💨 DEF (Dispositivos Eletrônicos para Fumar)", 
-                "🍂 TABACOS E DERIVADOS (Apreensão de Produto Ilegal)", 
-                "📢 TABACOS E DERIVADOS (Autuação por Propaganda Irregular)"
+                "🍂 Tabacos e Derivados (Registrados pela ANVISA) - Propaganda Irregular", 
+                "🍂 Tabacos e Derivados (Irregulares/Ilegais) - Apreensão"
             ])
                     
             if cat_macro != "Selecione...":
                 is_def = "DEF" in cat_macro
                 is_propaganda = "Propaganda" in cat_macro
+                is_ilegal = "Irregulares" in cat_macro
                 
-                # Se for Propaganda, puxa o mesmo banco de dados gigante de Tabacos e Derivados!
                 chave_db = "💨 DEF (Dispositivos Eletrônicos para Fumar)" if is_def else "🍂 TABACOS E DERIVADOS"
                 
-                tipos = ["Selecione..."] + list(DB_PRODUTOS[chave_db].keys()) + ["⚠️ OUTRO TIPO / MARCA NOVA"]
+                tipos = ["Selecione..."] + list(DB_PRODUTOS[chave_db].keys())
+                if is_ilegal or is_def:
+                    tipos.append("⚠️ OUTRO TIPO / MARCA NOVA")
+                
                 tipo_prod = st.selectbox("Tipo de Produto", tipos)
                 
                 if tipo_prod != "Selecione...":
-                    is_novo = "⚠️" in tipo_prod
-                    if is_novo: 
-                        prod = "Novo"
+                    is_novo_tipo = "⚠️" in tipo_prod
+                    if is_novo_tipo: 
+                        prod = "⚠️ CADASTRAR NOVA MARCA ILEGAL"
                     else:
-                        prods = ["Selecione..."] + list(DB_PRODUTOS[chave_db][tipo_prod].keys()) + ["⚠️ OUTRA MARCA (Salvar na Nuvem)"]
-                        prod = st.selectbox("Busque o Produto" if not is_propaganda else "Busque o Produto Anunciado", prods)
+                        todos_prods_tipo = DB_PRODUTOS[chave_db][tipo_prod]
+                        prods_filtrados = []
+                        
+                        # A Mágica da Separação Acontece Aqui:
+                        if is_propaganda:
+                            prods_filtrados = [p for p, v in todos_prods_tipo.items() if "Ilegal" not in v]
+                        elif is_ilegal:
+                            prods_filtrados = [p for p, v in todos_prods_tipo.items() if "Ilegal" in v]
+                        else: # DEF
+                            prods_filtrados = list(todos_prods_tipo.keys())
+                            
+                        prods_opcoes = ["Selecione..."] + prods_filtrados
+                        if is_ilegal or is_def:
+                            prods_opcoes.append("⚠️ CADASTRAR NOVA MARCA ILEGAL")
+                            
+                        label_prod = "Busque o Produto Anunciado" if is_propaganda else "Selecione ou Cadastre a Marca"
+                        prod = st.selectbox(label_prod, prods_opcoes)
                     
                     if prod != "Selecione...":
-                        texto_qtd = "Quantidade de Peças Publicitárias" if is_propaganda else "Quantidade (Unidades/Maços)"
+                        texto_qtd = "Peças Publicitárias" if is_propaganda else "Quantidade Apreendida (Unidades/Maços)"
                         qtd = st.number_input(texto_qtd, min_value=1)
                         f1_bytes, f2_bytes = None, None
                         
@@ -873,10 +892,10 @@ def app():
                         col_f1, col_f2 = st.columns(2)
                         
                         if metodo_foto == "📸 Câmera":
-                            f1 = col_f1.camera_input("1 - Embalagem/Propaganda Frontal")
+                            f1 = col_f1.camera_input("1 - Embalagem / Propaganda")
                             f2 = col_f2.camera_input("2 - Lote / CNPJ / Detalhes")
                         else:
-                            f1 = col_f1.file_uploader("1 - Embalagem/Propaganda Frontal", type=["jpg", "png", "jpeg"])
+                            f1 = col_f1.file_uploader("1 - Embalagem / Propaganda", type=["jpg", "png", "jpeg"])
                             f2 = col_f2.file_uploader("2 - Lote / CNPJ / Detalhes", type=["jpg", "png", "jpeg"])
                             
                         if f1: f1_bytes = f1.getvalue()
@@ -892,26 +911,21 @@ def app():
                             else:
                                 st.warning("Nenhum CNPJ detectado com clareza. Digite manualmente.")
 
-                        if is_novo or "⚠️" in prod:
+                        if prod == "⚠️ CADASTRAR NOVA MARCA ILEGAL":
                             c1, c2 = st.columns(2)
-                            n_novo = c1.text_input("Nome da Nova Marca/Produto")
-                            c_novo = c2.text_input("CNPJ (Opcional)", value=cnpj_extraido)
-                            t_novo = st.text_input("Tipo Específico (Opcional)", value=tipo_prod if not is_novo else "")
+                            n_novo = c1.text_input("Nome da Nova Marca Ilegal")
+                            c_novo = c2.text_input("CNPJ Falso/Inexistente (Opcional)", value=cnpj_extraido)
+                            t_novo = st.text_input("Tipo Específico (Opcional)", value=tipo_prod if not is_novo_tipo else "")
                             
-                            if st.button("➕ Confirmar Inserção e Salvar no Banco Global"):
+                            if st.button("➕ Confirmar Inserção e Salvar Ilegal no Banco"):
                                 nome_final = n_novo if n_novo else "Produto S/ Nome"
                                 cnpj_final = c_novo if c_novo else "Sem CNPJ"
                                 tipo_final = t_novo if t_novo else "Outros"
-                                
-                                # LÓGICA DE NEGÓCIO: Define o Status Automático
-                                if is_propaganda:
-                                    status_final = "Autuação (Propaganda Irregular)"
-                                else:
-                                    status_final = "Ilegal/Apreensão" if is_def else "Regular"
+                                status_final = "Ilegal/Apreensão"
                                 
                                 salvar_produto_nuvem(chave_db, tipo_final, nome_final, cnpj_final, status_final)
                                 
-                                cat_limpa = "Propaganda Irregular" if is_propaganda else ("DEF" if is_def else "Tabacos")
+                                cat_limpa = "Tabaco Irregular (Sem Registro)" if is_ilegal else "DEF"
                                 tipo_limpo = tipo_final.replace("🚬 ", "").replace("🕴️ ", "").replace("🌿 ", "").replace("🌾 ", "").replace("🌬️ ", "").replace("🪈 ", "")
                                 
                                 loja['itens'].append({
@@ -923,23 +937,23 @@ def app():
                                 })
                                 st.rerun()
                         else:
-                            # Produto já existente no banco local/nuvem
-                            if st.button("➕ Confirmar Inserção"):
+                            # Produto já existente no banco local ou Nuvem (Propaganda ou DEF ou Nuvem Ilegal)
+                            if st.button("➕ Confirmar Infração"):
                                 cnpj_banco = DB_PRODUTOS[chave_db][tipo_prod][prod]
                                 
-                                # LÓGICA DE NEGÓCIO: Define o Status Automático baseado na macro categoria
                                 if is_propaganda:
                                     status_banco = "Autuação (Propaganda Irregular)"
+                                    cat_limpa = "Propaganda Irregular (Produto Registrado)"
                                 else:
-                                    status_banco = "Regular" if "Ilegal" not in cnpj_banco else "Ilegal"
+                                    status_banco = "Ilegal/Apreensão"
+                                    cat_limpa = "Tabaco Irregular (Sem Registro)" if is_ilegal else "DEF"
                                 
-                                cat_limpa = "Propaganda Irregular" if is_propaganda else ("DEF" if is_def else "Tabacos")
                                 tipo_limpo = tipo_prod.replace("🚬 ", "").replace("🕴️ ", "").replace("🌿 ", "").replace("🌾 ", "").replace("🌬️ ", "").replace("🪈 ", "")
 
                                 loja['itens'].append({
                                     "Categoria": cat_limpa, "Tipo": tipo_limpo, 
                                     "Produto": prod, "Status": status_banco, 
-                                    "CNPJ Identificado": cnpj_banco, "Quantidade": qtd, 
+                                    "CNPJ Identificado": cnpj_banco.replace(" [Ilegal]", ""), "Quantidade": qtd, 
                                     "Hora": datetime.now().strftime('%H:%M:%S'),
                                     "Foto 1 Bytes": f1_bytes, "Foto 2 Bytes": f2_bytes
                                 })
@@ -949,7 +963,9 @@ def app():
             df_loja = pd.DataFrame(loja['itens']).drop(columns=['Foto 1 Bytes', 'Foto 2 Bytes'], errors='ignore')
             st.dataframe(df_loja, use_container_width=True)
             
-        if st.button("🔒 Fechar Esta Loja"):
+        if st.button("🔒 Fechar Esta Loja e Registrar Log"):
+            # Gatilho de auditoria forçado ao fechar a loja
+            registrar_log("Inspeção de Loja Concluída", f"Fechou a Loja {loja['numero']} com {len(loja['itens'])} infrações.")
             st.session_state['fisc_ativa']['lojas'].append(st.session_state['loja_ativa'])
             st.session_state['loja_ativa'] = None
             st.rerun()
@@ -984,7 +1000,6 @@ def app():
             st.markdown("### Lojas e Itens (Modo Edição)")
             for l_idx, loja in enumerate(fisc_edit['lojas']):
                 with st.expander(f"🏬 Loja {loja['numero']} - {loja['nome']} (Contém {len(loja['itens'])} itens)", expanded=True):
-                    # Editar Itens Existentes
                     for i_idx, item in enumerate(loja['itens']):
                         c1, c2, c3, c4 = st.columns([3, 1, 2, 1])
                         n_prod = c1.text_input(f"Produto #{i_idx+1}", value=item['Produto'], key=f"p_{idx}_{l_idx}_{i_idx}")
@@ -996,33 +1011,52 @@ def app():
                             st.rerun()
                         item['Produto'], item['Quantidade'], item['Status'] = n_prod, n_qtd, n_st
 
-                    # Seletor idêntico à Nova Fiscalização para Adicionar Item Esquecido
-                    st.markdown("#### ➕ Adicionar Item Esquecido nesta Loja")
+                    st.markdown("#### ➕ Adicionar Infração Esquecida nesta Loja")
                     c_cat, c_tipo, c_prod = st.columns(3)
-                    add_cat = c_cat.selectbox("Categoria", ["Selecione...", "💨 DEF (Dispositivos Eletrônicos para Fumar)", "🍂 TABACOS E DERIVADOS (Apreensão)", "📢 TABACOS E DERIVADOS (Propaganda Irregular)"], key=f"add_cat_{idx}_{l_idx}")
+                    
+                    add_cat = c_cat.selectbox("Categoria Macro", [
+                        "Selecione...", 
+                        "💨 DEF (Dispositivos Eletrônicos para Fumar)", 
+                        "🍂 Tabacos e Derivados (Registrados pela ANVISA) - Propaganda Irregular", 
+                        "🍂 Tabacos e Derivados (Irregulares/Ilegais) - Apreensão"
+                    ], key=f"add_cat_{idx}_{l_idx}")
                     
                     if add_cat != "Selecione...":
                         is_def_add = "DEF" in add_cat
                         is_propaganda_add = "Propaganda" in add_cat
+                        is_ilegal_add = "Irregulares" in add_cat
                         chave_db_add = "💨 DEF (Dispositivos Eletrônicos para Fumar)" if is_def_add else "🍂 TABACOS E DERIVADOS"
                         
                         tipos_add = ["Selecione..."] + list(DB_PRODUTOS[chave_db_add].keys())
                         add_tipo = c_tipo.selectbox("Tipo", tipos_add, key=f"add_tipo_{idx}_{l_idx}")
+                        
                         if add_tipo != "Selecione...":
-                            prods_add = ["Selecione..."] + list(DB_PRODUTOS[chave_db_add][add_tipo].keys())
+                            todos_prods_add = DB_PRODUTOS[chave_db_add][add_tipo]
+                            
+                            if is_propaganda_add:
+                                prods_add_filtrados = [p for p, v in todos_prods_add.items() if "Ilegal" not in v]
+                            elif is_ilegal_add:
+                                prods_add_filtrados = [p for p, v in todos_prods_add.items() if "Ilegal" in v]
+                            else:
+                                prods_add_filtrados = list(todos_prods_add.keys())
+                                
+                            prods_add = ["Selecione..."] + prods_add_filtrados
                             add_prod = c_prod.selectbox("Produto", prods_add, key=f"add_prod_{idx}_{l_idx}")
+                            
                             if add_prod != "Selecione...":
                                 c_qtd, c_btn = st.columns([1, 3])
                                 add_qtd = c_qtd.number_input("Quantidade", min_value=1, key=f"add_qtd_{idx}_{l_idx}")
+                                
                                 if c_btn.button("➕ Confirmar Inserção", key=f"btn_add_{idx}_{l_idx}"):
                                     cnpj_add = DB_PRODUTOS[chave_db_add][add_tipo][add_prod]
                                     
                                     if is_propaganda_add:
                                         status_add = "Autuação (Propaganda Irregular)"
+                                        cat_limpa = "Propaganda Irregular (Produto Registrado)"
                                     else:
-                                        status_add = "Regular" if "Ilegal" not in cnpj_add else "Ilegal/Apreensão"
+                                        status_add = "Ilegal/Apreensão"
+                                        cat_limpa = "Tabaco Irregular (Sem Registro)" if is_ilegal_add else "DEF"
                                     
-                                    cat_limpa = "Propaganda Irregular" if is_propaganda_add else ("DEF" if is_def_add else "Tabacos")
                                     tipo_limpo = add_tipo.replace("🚬 ", "").replace("🕴️ ", "").replace("🌿 ", "").replace("🌾 ", "").replace("🌬️ ", "").replace("🪈 ", "")
                                     
                                     loja['itens'].append({
@@ -1030,7 +1064,7 @@ def app():
                                         "Tipo": tipo_limpo, 
                                         "Produto": add_prod, 
                                         "Status": status_add, 
-                                        "CNPJ Identificado": cnpj_add, 
+                                        "CNPJ Identificado": cnpj_add.replace(" [Ilegal]", ""), 
                                         "Quantidade": add_qtd, 
                                         "Hora": datetime.now().strftime('%H:%M:%S'),
                                         "Foto 1 Bytes": None, "Foto 2 Bytes": None
@@ -1059,7 +1093,7 @@ def app():
         st.markdown("Visualização de eventos, cadastros e edições em tempo real na nuvem.")
         if st.button("🔄 Atualizar Trilha"): st.rerun()
         
-        # O "Dedo-Duro" de Erros do Supabase
+        # O Dedo-Duro de Erros do Supabase
         if 'log_error' in st.session_state:
             st.error(f"⚠️ Atenção! O Supabase bloqueou a gravação do Log. Erro retornado:\n\n{st.session_state['log_error']}\n\n*Verifique se a tabela 'auditoria' foi criada e se a segurança (RLS) dela foi desativada no SQL.*")
             
