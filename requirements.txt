@@ -5,3 +5,4 @@ fpdf2
 Pillow
 supabase
 pytesseract
+streamlit-option-menu
