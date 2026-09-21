@@ -33,25 +33,19 @@ st.set_page_config(page_title="GGTAB/ANVISA - Fiscalização", page_icon="🚭",
 def aplicar_tema_institucional():
     st.markdown("""
         <style>
-        /* Esconde elementos nativos do Streamlit */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
         
-        /* Fundo principal Off-White */
-        .stApp {
-            background-color: #F8F9FA;
-        }
-        
-        /* Cabeçalho Falso Gov.br */
+        /* Cabeçalho Falso Gov.br (Perfeito no Claro e no Escuro) */
         .gov-header {
             background-color: #0A3B7C;
             padding: 10px 20px;
-            color: white;
+            color: #FFFFFF !important;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             font-size: 14px;
             font-weight: 600;
-            border-bottom: 4px solid #00A859; /* Faixa Verde ANVISA */
+            border-bottom: 4px solid #00A859;
             position: fixed;
             top: 0;
             left: 0;
@@ -59,78 +53,47 @@ def aplicar_tema_institucional():
             z-index: 999999;
             display: flex;
             align-items: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
         
-        /* Ajuste de margem para o cabeçalho não cobrir conteúdo */
         .block-container {
             padding-top: 5rem !important;
         }
         
-        /* Botões Gerais (SaaS Style) */
-        button[kind="secondary"] {
-            border-radius: 8px !important;
-            border: 1px solid #DEE2E6 !important;
-            background-color: #FFFFFF !important;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important;
-            transition: all 0.2s ease-in-out !important;
-            font-weight: 500 !important;
-            color: #333333 !important;
-        }
-        button[kind="secondary"]:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.08) !important;
-            border-color: #0A3B7C !important;
-            color: #0A3B7C !important;
-        }
-        
-        /* Botões Primários (Ações Principais) */
+        /* Botões Primários - Azul Corporativo sempre */
         button[kind="primary"] {
             background-color: #0A3B7C !important;
             color: #FFFFFF !important;
             border-radius: 8px !important;
             border: none !important;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
-            transition: all 0.2s ease-in-out !important;
-            font-weight: 600 !important;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2) !important;
         }
         button[kind="primary"]:hover {
-            transform: translateY(-2px);
             background-color: #0050A0 !important;
-            box-shadow: 0 6px 12px rgba(0,0,0,0.15) !important;
         }
-
-        /* Inputs / Caixas de Texto com Foco Azul */
+        
+        /* Botões Secundários - Fundo transparente, borda azul */
+        button[kind="secondary"] {
+            border-radius: 8px !important;
+            border: 1px solid #0A3B7C !important;
+        }
+        
+        /* Caixas de Texto com cantos arredondados */
         .stTextInput>div>div>input, .stNumberInput>div>div>input {
             border-radius: 6px !important;
-            border: 1px solid #CED4DA !important;
-            background-color: #FFFFFF !important;
-            padding: 8px 12px !important;
         }
         .stTextInput>div>div>input:focus, .stNumberInput>div>div>input:focus {
             border-color: #0A3B7C !important;
             box-shadow: 0 0 0 1px #0A3B7C !important;
         }
         
-        /* Expanders (Cartões Flutuantes) */
+        /* Cartões Expansíveis (Lojas) acompanham a cor do sistema */
         div[data-testid="stExpander"] {
-            background-color: #FFFFFF;
             border-radius: 8px;
-            border: 1px solid #E9ECEF;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.04);
-            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
         }
         .streamlit-expanderHeader {
             font-weight: 600 !important;
-            color: #0A3B7C !important;
-            border-bottom: 1px solid #F1F3F5;
-        }
-        
-        /* Sidebar Clean */
-        [data-testid="stSidebar"] {
-            background-color: #FFFFFF !important;
-            border-right: 1px solid #E9ECEF !important;
-            box-shadow: 2px 0 8px rgba(0,0,0,0.03) !important;
         }
         </style>
         
@@ -831,16 +794,16 @@ def app():
         st.markdown(f"**Fiscal Ativo:** 👮 {st.session_state['nome_fiscal']}")
         st.markdown("---")
         
-        menu = option_menu(
+       menu = option_menu(
             menu_title="Painel GGTAB",
             options=["Dashboard Geral", "Consulta e Cadastro", "Nova Fiscalização", "Histórico / Edição", "Monitoramento (Logs)"],
             icons=["bar-chart-fill", "search", "clipboard-check-fill", "folder-fill", "eye-fill"],
             menu_icon="bank",
             default_index=2,
             styles={
-                "container": {"padding": "0!important", "background-color": "#FFFFFF", "border": "none"},
-                "icon": {"color": "#0A3B7C", "font-size": "18px"}, 
-                "nav-link": {"font-size": "15px", "text-align": "left", "margin":"2px", "--hover-color": "#F1F3F5", "color": "#333333"},
+                "container": {"padding": "0!important", "background-color": "transparent", "border": "none"},
+                "icon": {"color": "#00A859", "font-size": "18px"}, /* Verde ANVISA destaca bem no escuro e claro */
+                "nav-link": {"font-size": "15px", "text-align": "left", "margin":"2px"},
                 "nav-link-selected": {"background-color": "#0A3B7C", "color": "white", "font-weight": "bold"},
             }
         )
