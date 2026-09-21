@@ -1050,7 +1050,7 @@ def app():
                     st.toast("✅ Edição sincronizada com sucesso!", icon="✅")
 
     elif menu == "Monitoramento (Logs)":
-        st.title("👁️ Trilha de Auditoria (AgGrid Enterprise)")
+        st.title("👁️ Trilha de Auditoria")
         if st.button("🔄 Atualizar Trilha", type="secondary"): st.rerun()
             
         if supabase_client:
