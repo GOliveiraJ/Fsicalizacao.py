@@ -785,11 +785,14 @@ def tela_login():
 # ==========================================
 # INTERFACE PRINCIPAL (NOVO MENU SAAS)
 # ==========================================
+# ==========================================
+# INTERFACE PRINCIPAL (NOVO MENU SAAS)
+# ==========================================
 def app():
     global DB_PRODUTOS 
     DB_PRODUTOS = obter_banco_atualizado()
     
-   with st.sidebar:
+    with st.sidebar:
         st.markdown(f"**Fiscal Ativo:** 👮 {st.session_state['nome_fiscal']}")
         st.markdown("---")
         
@@ -813,14 +816,13 @@ def app():
         
         st.markdown("---")
         if supabase_client: st.success("🟢 Nuvem Ativa")
-        else: st.error("🔴 Rodando Localmente")
+        else: st.error("🔴 A Correr Localmente")
         
         st.markdown("---")
         if st.button("Sair do Sistema", use_container_width=True):
-            registrar_log("Logout", "Usuário saiu do sistema.")
+            registrar_log("Logout", "Utilizador saiu do sistema.")
             st.session_state['autenticado'] = False
             st.rerun()
-
     # --- TELA 1: DASHBOARD ---
     if menu == "Dashboard Geral":
         st.title("📊 Painel de Inteligência GGTAB")
