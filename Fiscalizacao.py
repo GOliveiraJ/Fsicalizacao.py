@@ -20,6 +20,7 @@ except ImportError:
 
 try:
     import plotly.express as px
+    import plotly.graph_objects as go
     HAS_PLOTLY = True
 except ImportError:
     HAS_PLOTLY = False
@@ -722,6 +723,7 @@ if 'nome_fiscal' not in st.session_state: st.session_state['nome_fiscal'] = ""
 if 'historico_operacoes' not in st.session_state: st.session_state['historico_operacoes'] = []
 if 'fisc_ativa' not in st.session_state: st.session_state['fisc_ativa'] = None
 if 'loja_ativa' not in st.session_state: st.session_state['loja_ativa'] = None
+if 'chat_ia' not in st.session_state: st.session_state['chat_ia'] = [{"role": "assistant", "content": "Olá, Fiscal. Sou a IA Jurídica da GGTAB. Pergunte-me sobre Cigarros Eletrônicos, Propaganda, Embalagens ou Apreensões de produtos sem registro."}]
 
 def tela_login():
     st.title("🛡️ Portal de Fiscalização GGTAB")
@@ -742,7 +744,7 @@ def tela_login():
                     st.toast("❌ Credenciais inválidas.", icon="❌")
 
 # ==========================================
-# INTERFACE PRINCIPAL (MODAIS, AGGRID, PLOTLY)
+# INTERFACE PRINCIPAL (MODAIS, BI, IA RAG)
 # ==========================================
 def app():
     global DB_PRODUTOS 
@@ -864,7 +866,7 @@ def app():
                             else: status_banco, cat_limpa = "Ilegal/Apreensão", "DEF"
                             
                             st.session_state['loja_ativa']['itens'].append({
-                                "Categoria": cat_limpa, "Tipo": tipo_prod.replace("🚬 ", "").replace("🕴️ ", "").replace("🌿 ", "").replace("🌾 ", "").replace("🌬️ ", "").replace("🪈 ", ""), 
+                                "Categoria": cat_limpa, "Tipo": tipo_prod.replace("🚬 ", "").replace("🚬 ", "").replace("🕴️ ", "").replace("🌿 ", "").replace("🌾 ", "").replace("🌬️ ", "").replace("🪈 ", ""), 
                                 "Produto": prod, "Status": status_banco, "CNPJ Identificado": cnpj_banco.replace(" [Ilegal]", ""), 
                                 "Quantidade": qtd, "Hora": datetime.now().strftime('%H:%M:%S'),
                                 "Foto 1 Bytes": f1_bytes, "Foto 2 Bytes": f2_bytes
@@ -878,14 +880,14 @@ def app():
         st.markdown("---")
         menu = option_menu(
             menu_title="Painel GGTAB",
-            options=["Dashboard Geral", "Consulta e Cadastro", "Nova Fiscalização", "Histórico / Edição", "Monitoramento (Logs)"],
-            icons=["bar-chart-fill", "search", "clipboard-check-fill", "folder-fill", "eye-fill"],
+            options=["Dashboard Geral", "Consulta e Cadastro", "Nova Fiscalização", "Histórico / Edição", "Assistente Jurídico (IA)", "Monitoramento (Logs)"],
+            icons=["bar-chart-fill", "search", "clipboard-check-fill", "folder-fill", "robot", "eye-fill"],
             menu_icon="bank",
-            default_index=2,
+            default_index=0,
             styles={
                 "container": {"padding": "0!important", "background-color": "transparent", "border": "none"},
-                "icon": {"color": "#00A859", "font-size": "18px"}, 
-                "nav-link": {"font-size": "15px", "text-align": "left", "margin":"2px"},
+                "icon": {"color": "#00A859", "font-size": "16px"}, 
+                "nav-link": {"font-size": "14px", "text-align": "left", "margin":"2px"},
                 "nav-link-selected": {"background-color": "#0A3B7C", "color": "white", "font-weight": "bold"},
             }
         )
@@ -898,54 +900,134 @@ def app():
         if supabase_client: st.success("🟢 Nuvem Ativa")
         else: st.error("🔴 Sem Nuvem")
         
-        st.markdown("---")
         if st.button("Sair do Sistema", use_container_width=True):
             registrar_log("Logout", "Utilizador saiu do sistema.")
             st.session_state['autenticado'] = False
             st.rerun()
 
-    # --- TELAS DO APP ---
+    # --- TELA 1: DASHBOARD ENTERPRISE (BI FORA DO BI) ---
     if menu == "Dashboard Geral":
-        st.title("📊 Painel de Inteligência GGTAB")
-        todas_operacoes = st.session_state['historico_operacoes'].copy()
-        if st.session_state['fisc_ativa'] and st.session_state['fisc_ativa']['lojas']: todas_operacoes.append(st.session_state['fisc_ativa'])
+        st.title("📈 Painel Executivo de Inteligência GGTAB")
+        st.markdown("Visão global consolidada. O sistema cruza os dados locais em andamento com a base nacional da Nuvem.")
+        
+        # Puxa todo o histórico de fiscalizações salvos no Supabase
+        dados_bi = []
+        if supabase_client:
+            try:
+                resp = supabase_client.table("apreensoes").select("*").execute()
+                dados_bi.extend(resp.data)
+            except Exception: pass
             
-        total_ops = len(todas_operacoes)
-        total_lojas = sum(len(op['lojas']) for op in todas_operacoes)
-        total_produtos = sum(item['Quantidade'] for op in todas_operacoes for l in op['lojas'] for item in l['itens'])
-        total_ilegais = sum(item['Quantidade'] for op in todas_operacoes for l in op['lojas'] for item in l['itens'] if "Ilegal" in item['Status'] or "Propaganda" in item['Status'])
-        
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Operações", total_ops)
-        c2.metric("Lojas Auditadas", total_lojas)
-        c3.metric("Itens Totais", total_produtos)
-        c4.metric("Infrações (Ilegais/Propaganda)", total_ilegais, delta="Atenção", delta_color="inverse")
-        st.markdown("---")
-        
-        # O GRÁFICO PLOTLY DE INTELIGÊNCIA EXECUTIVA
-        if HAS_PLOTLY and total_produtos > 0:
-            st.subheader("Análise Gráfica de Infrações")
-            df_grafico = []
-            for op in todas_operacoes:
-                for l in op['lojas']:
-                    for item in l['itens']:
-                        df_grafico.append({"Status": item['Status'], "Quantidade": item['Quantidade']})
-            
-            if df_grafico:
-                df_plotly = pd.DataFrame(df_grafico)
-                fig = px.pie(df_plotly, values='Quantidade', names='Status', hole=0.4, 
-                             color_discrete_sequence=["#0A3B7C", "#00A859", "#D93838", "#F4A261"])
-                fig.update_layout(margin=dict(t=0, b=0, l=0, r=0))
-                st.plotly_chart(fig, use_container_width=True)
-        
-        st.info("Sistema conectado ao banco de dados unificado na nuvem.")
+        # Adiciona também a operação local que o fiscal está fazendo agora
+        for op in st.session_state['historico_operacoes'] + ([st.session_state['fisc_ativa']] if st.session_state['fisc_ativa'] else []):
+            for loja in op['lojas']:
+                for it in loja['itens']:
+                    dados_bi.append({
+                        "operacao_id": op['operacao_id'], "loja": loja['nome'],
+                        "categoria": it['Categoria'], "tipo": it['Tipo'],
+                        "produto": it['Produto'], "status": it['Status'],
+                        "quantidade": it['Quantidade']
+                    })
 
-    elif menu == "Consulta e Cadastro":
-        st.title("🗃️ Gestão de Produtos (Base de Dados)")
-        st.markdown("Explore a base completa. Clique no botão abaixo para adicionar permanentemente uma nova marca Ilegal ou Regular na nuvem.")
+        df_bi = pd.DataFrame(dados_bi)
+
+        # Se houver dados, montar o BI completo
+        if not df_bi.empty:
+            total_ops = df_bi['operacao_id'].nunique()
+            total_lojas = df_bi['loja'].nunique()
+            total_produtos = df_bi['quantidade'].sum()
+            
+            # Filtro inteligente de ilegais
+            df_ilegais = df_bi[df_bi['status'].str.contains("Ilegal|Propaganda", case=False, na=False)]
+            total_ilegais = df_ilegais['quantidade'].sum() if not df_ilegais.empty else 0
+
+            # LINHA 1: KPIs Principais
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Total de Operações (Histórico)", total_ops)
+            c2.metric("Lojas Fiscalizadas", total_lojas)
+            c3.metric("Volume de Itens/Peças", f"{total_produtos:,}")
+            c4.metric("Total de Infrações (Ilegal/Propaganda)", f"{total_ilegais:,}", delta="Alerta Vermelho", delta_color="inverse")
+            st.markdown("---")
+
+            if HAS_PLOTLY:
+                col_graf1, col_graf2 = st.columns([1, 1.2])
+                
+                with col_graf1:
+                    st.subheader("Distribuição Regulatória")
+                    # Agrupar por Status limpo (Regular vs Ilegal)
+                    df_status = df_bi.copy()
+                    df_status['Status Geral'] = df_status['status'].apply(lambda x: "Regular" if x == "Regular" else "Infração (Ilegal/Propaganda)")
+                    df_pie = df_status.groupby("Status Geral")['quantidade'].sum().reset_index()
+                    fig1 = px.pie(df_pie, values='quantidade', names='Status Geral', hole=0.4,
+                                  color='Status Geral', color_discrete_map={"Regular": "#00A859", "Infração (Ilegal/Propaganda)": "#D93838"})
+                    fig1.update_layout(margin=dict(t=30, b=0, l=0, r=0))
+                    st.plotly_chart(fig1, use_container_width=True)
+
+                with col_graf2:
+                    st.subheader("Top 5 Produtos Autuados")
+                    df_top = df_ilegais.groupby("produto")['quantidade'].sum().reset_index()
+                    df_top = df_top.sort_values(by="quantidade", ascending=False).head(5)
+                    
+                    if not df_top.empty:
+                        fig2 = px.bar(df_top, x="quantidade", y="produto", orientation='h', text='quantidade',
+                                      color_discrete_sequence=["#0A3B7C"])
+                        fig2.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(t=30, b=0, l=0, r=0))
+                        st.plotly_chart(fig2, use_container_width=True)
+                    else:
+                        st.info("Nenhuma infração registrada para gerar o ranking de produtos.")
+                        
+                st.markdown("---")
+                st.subheader("Mapeamento de Infrações por Tipo (DEF vs Derivados)")
+                df_tipo = df_ilegais.groupby("tipo")['quantidade'].sum().reset_index()
+                if not df_tipo.empty:
+                    fig3 = px.bar(df_tipo, x="tipo", y="quantidade", color="tipo", text="quantidade", color_discrete_sequence=px.colors.qualitative.Bold)
+                    fig3.update_layout(margin=dict(t=30, b=0, l=0, r=0), showlegend=False)
+                    st.plotly_chart(fig3, use_container_width=True)
+        else:
+            st.info("Nenhuma operação registrada na Nuvem ou na sessão atual. Inicie uma nova auditoria para popular o Dashboard.")
+
+    # --- TELA 2: ASSISTENTE JURÍDICO (RAG / IA SIMULADO) ---
+    elif menu == "Assistente Jurídico (IA)":
+        st.title("⚖️ Assistente Jurídico GGTAB (IA)")
+        st.markdown("Consulte instantaneamente a base legal da ANVISA para fundamentar os autos de infração.")
         
-        if st.button("➕ Cadastrar Nova Marca na Nuvem", type="primary"):
-            modal_cadastro()
+        # Exibe o histórico do chat
+        for msg in st.session_state['chat_ia']:
+            with st.chat_message(msg["role"]): st.markdown(msg["content"])
+
+        # O Cérebro do RAG (Base de Conhecimento Simulado)
+        base_conhecimento = {
+            "eletronico|def|vape|pod": "**RDC nº 855/2024**: Proíbe a fabricação, a importação, a comercialização, a distribuição, o armazenamento, o transporte e a propaganda de dispositivos eletrônicos para fumar (DEF).\n\n*Ação Sugerida:* O produto carece de registro na Anvisa, sendo passível de apreensão sumária e inutilização, com base também na Lei 6.437/77.",
+            "propaganda|anuncio|cartaz|display": "**RDC nº 840/2023 & Lei 9.294/96**: É terminantemente proibida a propaganda comercial de produtos fumígenos derivados ou não do tabaco. Expositores não podem conter iluminação que destaque o produto, nem cartazes promocionais.\n\n*Ação Sugerida:* Autuação do estabelecimento por exibição irregular, mesmo que o produto seja registrado.",
+            "registro|ilegal|sem cnpj": "**RDC nº 896/2024**: Dispõe sobre o registro de produtos fumígenos derivados do tabaco. Produtos sem registro válido na Anvisa não podem ser comercializados.\n\n*Ação Sugerida:* Apreensão cautelar dos itens sem registro, fundamentada na Lei 6.437/77 por exposição à venda de produto irregular.",
+            "embalagem|advertencia": "**RDC nº 838/2023**: Exige a presença obrigatória de advertências sanitárias e imagens padronizadas pela Anvisa nas embalagens de produtos fumígenos.\n\n*Ação Sugerida:* Fiscalização de embalagem; produto em desacordo está sujeito a recolhimento."
+        }
+
+        # Caixa de texto do usuário
+        prompt = st.chat_input("Ex: 'Qual a RDC para cigarro eletrônico?'")
+        if prompt:
+            # Adiciona pergunta na tela
+            st.session_state['chat_ia'].append({"role": "user", "content": prompt})
+            with st.chat_message("user"): st.markdown(prompt)
+            
+            # IA processa a resposta
+            resposta_ia = "Não encontrei uma fundamentação exata para essa palavra-chave. Tente buscar por termos como: **DEF, Propaganda, Registro ou Embalagem**."
+            prompt_limpo = prompt.lower()
+            for chave, texto in base_conhecimento.items():
+                palavras = chave.split("|")
+                if any(p in prompt_limpo for p in palavras):
+                    resposta_ia = texto
+                    break
+                    
+            # Adiciona resposta na tela
+            st.session_state['chat_ia'].append({"role": "assistant", "content": resposta_ia})
+            with st.chat_message("assistant"): st.markdown(resposta_ia)
+
+    # --- TELA 3: CONSULTA E CADASTRO ---
+    elif menu == "Consulta e Cadastro":
+        st.title("🗃️ Gestão de Produtos")
+        st.markdown("Explore a base completa. Clique no botão abaixo para adicionar permanentemente uma nova marca Ilegal ou Regular na nuvem.")
+        if st.button("➕ Cadastrar Nova Marca na Nuvem", type="primary"): modal_cadastro()
             
         resultados = []
         for cat, tipos in DB_PRODUTOS.items():
@@ -955,18 +1037,16 @@ def app():
                     resultados.append({"Categoria": cat, "Tipo": tipo, "Produto": prod, "CNPJ": cnpj.replace(" [Ilegal]", ""), "Status": status_base})
         
         df_resultados = pd.DataFrame(resultados)
-        
         if HAS_AGGRID:
             gb = GridOptionsBuilder.from_dataframe(df_resultados)
             gb.configure_pagination(paginationAutoPageSize=True, paginationPageSize=15)
             gb.configure_default_column(filter=True, sortable=True, resizable=True)
             AgGrid(df_resultados, gridOptions=gb.build(), theme='streamlit', fit_columns_on_grid_load=True)
-        else:
-            st.dataframe(df_resultados, use_container_width=True)
+        else: st.dataframe(df_resultados, use_container_width=True)
 
+    # --- TELA 4: NOVA FISCALIZAÇÃO ---
     elif menu == "Nova Fiscalização":
         st.title("📝 Registro de Operação")
-        
         if not st.session_state['fisc_ativa']:
             if st.button("▶️ Iniciar Nova Operação de Fiscalização", type="primary"):
                 op_id = f"OP-{len(st.session_state['historico_operacoes']) + 1}-{datetime.now().strftime('%Y%m%d%H%M')}"
@@ -980,8 +1060,7 @@ def app():
         if not st.session_state['loja_ativa']:
             st.info("Nenhuma loja ativa no momento. Inicie uma nova auditoria para registrar apreensões.")
             c1, c2 = st.columns([1, 3])
-            if c1.button("📍 Entrar em Novo Estabelecimento", type="primary"):
-                modal_nova_loja()
+            if c1.button("📍 Entrar em Novo Estabelecimento", type="primary"): modal_nova_loja()
             
             if st.session_state['fisc_ativa']['lojas']:
                 if c2.button("🏁 Finalizar Operação Total (Sincronizar Nuvem)", type="secondary"):
@@ -1006,11 +1085,8 @@ def app():
 
         loja = st.session_state['loja_ativa']
         st.subheader(f"🏬 Loja {loja['numero']} - {loja['nome']}")
-        
         c1, c2 = st.columns([2, 1])
-        if c1.button("➕ Registrar Nova Infração", type="primary", use_container_width=True):
-            modal_infracao()
-            
+        if c1.button("➕ Registrar Nova Infração", type="primary", use_container_width=True): modal_infracao()
         if c2.button("🔒 Encerrar Auditoria nesta Loja", type="secondary", use_container_width=True):
             registrar_log("Loja Concluída", f"Fechou a Loja {loja['numero']}")
             st.session_state['fisc_ativa']['lojas'].append(st.session_state['loja_ativa'])
@@ -1021,9 +1097,9 @@ def app():
             st.markdown("### Infrações Registradas")
             df_loja = pd.DataFrame(loja['itens']).drop(columns=['Foto 1 Bytes', 'Foto 2 Bytes'], errors='ignore')
             st.dataframe(df_loja, use_container_width=True)
-        else:
-            st.info("Nenhuma infração registrada nesta loja até o momento.")
+        else: st.info("Nenhuma infração registrada nesta loja até o momento.")
 
+    # --- TELA 5: HISTÓRICO / EDIÇÃO ---
     elif menu == "Histórico / Edição":
         st.title("📂 Histórico e Edição")
         ops = st.session_state['historico_operacoes']
@@ -1071,6 +1147,7 @@ def app():
                     if novos_dados: supabase_client.table("apreensoes").insert(novos_dados).execute()
                     st.toast("✅ Edição sincronizada com sucesso!", icon="✅")
 
+    # --- TELA 6: MONITORAMENTO ---
     elif menu == "Monitoramento (Logs)":
         st.title("👁️ Trilha de Auditoria (AgGrid Enterprise)")
         if st.button("🔄 Atualizar Trilha", type="secondary"): st.rerun()
@@ -1082,14 +1159,12 @@ def app():
                     df_logs = pd.DataFrame(resp.data)
                     df_logs['data_hora'] = pd.to_datetime(df_logs['data_hora']).dt.strftime('%d/%m/%Y %H:%M:%S')
                     df_logs = df_logs[['data_hora', 'fiscal', 'acao', 'detalhes']]
-                    
                     if HAS_AGGRID:
                         gb = GridOptionsBuilder.from_dataframe(df_logs)
                         gb.configure_pagination(paginationAutoPageSize=True, paginationPageSize=20)
                         gb.configure_default_column(filter=True, sortable=True)
                         AgGrid(df_logs, gridOptions=gb.build(), theme='streamlit', fit_columns_on_grid_load=True)
-                    else:
-                        st.dataframe(df_logs, use_container_width=True)
+                    else: st.dataframe(df_logs, use_container_width=True)
                 else: st.info("Nenhum registro encontrado.")
             except Exception as e: st.error("Erro ao carregar auditoria.")
         else: st.warning("Conecte ao Supabase para visualizar o monitoramento.")
