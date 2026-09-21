@@ -7,6 +7,12 @@ import copy
 from fpdf import FPDF
 from PIL import Image
 
+# IMPORTANTE: Adicione streamlit-option-menu no requirements.txt
+try:
+    from streamlit_option_menu import option_menu
+except ImportError:
+    st.error("Por favor, adicione 'streamlit-option-menu' no seu requirements.txt")
+
 try:
     from supabase import create_client, Client
     HAS_SUPABASE = True
@@ -20,12 +26,123 @@ except ImportError:
     HAS_OCR = False
 
 # ==========================================
-# CONFIGURAÇÃO E TEMA
+# CONFIGURAÇÃO E TEMA GOV.BR / ENTERPRISE
 # ==========================================
 st.set_page_config(page_title="GGTAB/ANVISA - Fiscalização", page_icon="🚭", layout="wide")
 
+def aplicar_tema_institucional():
+    st.markdown("""
+        <style>
+        /* Esconde elementos nativos do Streamlit */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        
+        /* Fundo principal Off-White */
+        .stApp {
+            background-color: #F8F9FA;
+        }
+        
+        /* Cabeçalho Falso Gov.br */
+        .gov-header {
+            background-color: #0A3B7C;
+            padding: 10px 20px;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            border-bottom: 4px solid #00A859; /* Faixa Verde ANVISA */
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 999999;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        /* Ajuste de margem para o cabeçalho não cobrir conteúdo */
+        .block-container {
+            padding-top: 5rem !important;
+        }
+        
+        /* Botões Gerais (SaaS Style) */
+        button[kind="secondary"] {
+            border-radius: 8px !important;
+            border: 1px solid #DEE2E6 !important;
+            background-color: #FFFFFF !important;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important;
+            transition: all 0.2s ease-in-out !important;
+            font-weight: 500 !important;
+            color: #333333 !important;
+        }
+        button[kind="secondary"]:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.08) !important;
+            border-color: #0A3B7C !important;
+            color: #0A3B7C !important;
+        }
+        
+        /* Botões Primários (Ações Principais) */
+        button[kind="primary"] {
+            background-color: #0A3B7C !important;
+            color: #FFFFFF !important;
+            border-radius: 8px !important;
+            border: none !important;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
+            transition: all 0.2s ease-in-out !important;
+            font-weight: 600 !important;
+        }
+        button[kind="primary"]:hover {
+            transform: translateY(-2px);
+            background-color: #0050A0 !important;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15) !important;
+        }
+
+        /* Inputs / Caixas de Texto com Foco Azul */
+        .stTextInput>div>div>input, .stNumberInput>div>div>input {
+            border-radius: 6px !important;
+            border: 1px solid #CED4DA !important;
+            background-color: #FFFFFF !important;
+            padding: 8px 12px !important;
+        }
+        .stTextInput>div>div>input:focus, .stNumberInput>div>div>input:focus {
+            border-color: #0A3B7C !important;
+            box-shadow: 0 0 0 1px #0A3B7C !important;
+        }
+        
+        /* Expanders (Cartões Flutuantes) */
+        div[data-testid="stExpander"] {
+            background-color: #FFFFFF;
+            border-radius: 8px;
+            border: 1px solid #E9ECEF;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.04);
+            margin-bottom: 15px;
+        }
+        .streamlit-expanderHeader {
+            font-weight: 600 !important;
+            color: #0A3B7C !important;
+            border-bottom: 1px solid #F1F3F5;
+        }
+        
+        /* Sidebar Clean */
+        [data-testid="stSidebar"] {
+            background-color: #FFFFFF !important;
+            border-right: 1px solid #E9ECEF !important;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.03) !important;
+        }
+        </style>
+        
+        <div class="gov-header">
+            🇧🇷 REPÚBLICA FEDERATIVA DO BRASIL | MINISTÉRIO DA SAÚDE - ANVISA (GGTAB)
+        </div>
+    """, unsafe_allow_html=True)
+
+aplicar_tema_institucional()
+
 # ==========================================
-# CONEXÃO SUPABASE & AUDITORIA COM DETECTOR DE ERRO
+# CONEXÃO SUPABASE & AUDITORIA
 # ==========================================
 @st.cache_resource
 def init_supabase():
@@ -576,10 +693,8 @@ def obter_fundamentacao_legal(categoria, status):
     if "DEF" in categoria: 
         fundamentos.append("RDC nº 855/2024 e Lei 6.437/77 (Comercialização de DEF)")
     else:
-        # Pega Propaganda
         if "Propaganda" in categoria or "Propaganda" in status: 
             fundamentos.append("RDC nº 840/2023 e Lei 9.294/96 (Propaganda Irregular)")
-        # Pega Apreensão de Ilegal
         if "Ilegal" in status or "Apreensão" in categoria or "Nao Registrado" in status: 
             fundamentos.append("RDC nº 896/2024 e Lei 6.437/77 (Produto Fumeiro Sem Registro / Ilegal)")
             
@@ -638,7 +753,6 @@ def gerar_pdf(fisc):
                 pdf.set_font("helvetica", size=10)
                 pdf.cell(0, 6, clean_text_for_pdf(f"Categoria: {item['Categoria']} | Tipo: {item['Tipo']}"), ln=True)
                 
-                # Tratamento de texto da quantidade baseado no duplo status
                 if "Propaganda" in item['Categoria'] or "Propaganda" in item['Status']: 
                     if "Apreensão" in item['Status']:
                         qtd_str = f"Qtd Apreendida / Peças Publ.: {item['Quantidade']} | Status: {item['Status']}"
@@ -683,59 +797,70 @@ if 'fisc_ativa' not in st.session_state: st.session_state['fisc_ativa'] = None
 if 'loja_ativa' not in st.session_state: st.session_state['loja_ativa'] = None
 
 def tela_login():
-    st.title("🚭 Portal de Fiscalização - GGTAB/CCTAB")
+    st.title("🛡️ Portal de Fiscalização GGTAB")
     st.markdown("---")
     if st.session_state['tentativas_login'] >= 10:
         st.error("❌ Acesso bloqueado por excesso de tentativas. Contate a TI.")
         return
-    with st.form("form_login"):
-        st.subheader("Acesso ao Servidor Único")
-        usuario = st.text_input("Login")
-        senha = st.text_input("Senha", type="password")
-        nome = st.text_input("Seu Nome Completo (Para auditoria)")
-        if st.form_submit_button("Entrar"):
-            if usuario == "GGTAB" and senha == "CCTAB" and nome.strip() != "":
-                st.session_state['autenticado'], st.session_state['nome_fiscal'], st.session_state['tentativas_login'] = True, nome.strip(), 0
-                registrar_log("Login", "Acesso concedido ao sistema.")
-                st.rerun()
-            else:
-                st.session_state['tentativas_login'] += 1
-                st.error(f"❌ Inválido. {10 - st.session_state['tentativas_login']} tentativa(s) restantes.")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        with st.form("form_login"):
+            st.subheader("Acesso ao Servidor Único")
+            usuario = st.text_input("Login")
+            senha = st.text_input("Senha", type="password")
+            nome = st.text_input("Seu Nome Completo (Para auditoria)")
+            if st.form_submit_button("Entrar no Sistema", type="primary"):
+                if usuario == "GGTAB" and senha == "CCTAB" and nome.strip() != "":
+                    st.session_state['autenticado'], st.session_state['nome_fiscal'], st.session_state['tentativas_login'] = True, nome.strip(), 0
+                    registrar_log("Login", "Acesso concedido ao sistema.")
+                    st.rerun()
+                else:
+                    st.session_state['tentativas_login'] += 1
+                    st.error(f"❌ Inválido. {10 - st.session_state['tentativas_login']} tentativa(s) restantes.")
 
 # ==========================================
-# INTERFACE PRINCIPAL
+# INTERFACE PRINCIPAL (NOVO MENU SAAS)
 # ==========================================
 def app():
     global DB_PRODUTOS 
     DB_PRODUTOS = obter_banco_atualizado()
     
-    st.sidebar.title("🏛️ GGTAB - CCTAB")
-    st.sidebar.markdown(f"**Fiscal:** 👮 {st.session_state['nome_fiscal']}")
-    
-    menu = st.sidebar.radio("Navegação", [
-        "📊 Dashboard Geral", 
-        "🔍 Consulta e Cadastro", 
-        "📝 Nova Fiscalização", 
-        "📂 Fiscalizações Anteriores",
-        "👁️ Monitoramento (Logs)"
-    ])
-    
-    if st.session_state['fisc_ativa']:
-        duracao = datetime.now() - st.session_state['fisc_ativa']['data_inicio']
-        st.sidebar.metric(label="⏱️ Operação Ativa", value=f"{duracao.seconds//3600:02d}:{(duracao.seconds//60)%60:02d}:{duracao.seconds%60:02d}")
-    
-    st.sidebar.markdown("---")
-    if supabase_client: st.sidebar.success("🟢 Nuvem Ativa (Supabase)")
-    else: st.sidebar.error("🔴 Rodando Localmente")
-    
-    st.sidebar.markdown("---")
-    if st.sidebar.button("Sair do Sistema"):
-        registrar_log("Logout", "Usuário saiu do sistema.")
-        st.session_state['autenticado'] = False
-        st.rerun()
+    with st.sidebar:
+        # Trocamos o radio antigo pelo menu elegante com ícones
+        st.markdown(f"**Fiscal Ativo:** 👮 {st.session_state['nome_fiscal']}")
+        st.markdown("---")
+        
+        menu = option_menu(
+            menu_title="Painel GGTAB",
+            options=["Dashboard Geral", "Consulta e Cadastro", "Nova Fiscalização", "Histórico / Edição", "Monitoramento (Logs)"],
+            icons=["bar-chart-fill", "search", "clipboard-check-fill", "folder-fill", "eye-fill"],
+            menu_icon="bank",
+            default_index=2,
+            styles={
+                "container": {"padding": "0!important", "background-color": "#FFFFFF", "border": "none"},
+                "icon": {"color": "#0A3B7C", "font-size": "18px"}, 
+                "nav-link": {"font-size": "15px", "text-align": "left", "margin":"2px", "--hover-color": "#F1F3F5", "color": "#333333"},
+                "nav-link-selected": {"background-color": "#0A3B7C", "color": "white", "font-weight": "bold"},
+            }
+        )
+        
+        if st.session_state['fisc_ativa']:
+            duracao = datetime.now() - st.session_state['fisc_ativa']['data_inicio']
+            st.metric(label="⏱️ Operação Ativa", value=f"{duracao.seconds//3600:02d}:{(duracao.seconds//60)%60:02d}:{duracao.seconds%60:02d}")
+        
+        st.markdown("---")
+        if supabase_client: st.success("🟢 Nuvem Ativa")
+        else: st.error("🔴 Rodando Localmente")
+        
+        st.markdown("---")
+        if st.button("Sair do Sistema", use_container_width=True):
+            registrar_log("Logout", "Usuário saiu do sistema.")
+            st.session_state['autenticado'] = False
+            st.rerun()
 
     # --- TELA 1: DASHBOARD ---
-    if menu == "📊 Dashboard Geral":
+    if menu == "Dashboard Geral":
         st.title("📊 Painel de Inteligência GGTAB")
         todas_operacoes = st.session_state['historico_operacoes'].copy()
         if st.session_state['fisc_ativa'] and st.session_state['fisc_ativa']['lojas']:
@@ -755,8 +880,8 @@ def app():
         st.info("O sistema está sincronizado com o banco de dados oficial e customizado da nuvem.")
 
     # --- TELA 2: CONSULTA E CADASTRO ALINHADO ---
-    elif menu == "🔍 Consulta e Cadastro":
-        st.title("🗃️ Gestão de Produtos (Base ANVISA + Customizada)")
+    elif menu == "Consulta e Cadastro":
+        st.title("🗃️ Gestão de Produtos")
         aba_consulta, aba_cadastro = st.tabs(["🔍 Consultar Existentes", "➕ Cadastrar Nova Marca"])
         
         with aba_consulta:
@@ -778,7 +903,6 @@ def app():
             with st.form("form_cadastro_produto"):
                 c1, c2 = st.columns(2)
                 
-                # NOVO MENU MACRO IDÊNTICO À FISCALIZAÇÃO
                 cat_cad = c1.selectbox("Categoria Macro", [
                     "Selecione...", 
                     "💨 DEF (Dispositivos Eletrônicos para Fumar)", 
@@ -800,7 +924,6 @@ def app():
                 prod_cad = c3.text_input("Nome Comercial da Marca/Produto")
                 cnpj_cad = c4.text_input("CNPJ (Se houver)")
                 
-                # Define o status do cadastro baseado na Macro Categoria
                 if "Registrados" in cat_cad:
                     status_cad = "Regular"
                     st.caption("Status automático: ✅ Regular (Registrado pela ANVISA)")
@@ -810,13 +933,12 @@ def app():
                 
                 if st.form_submit_button("Salvar no Banco Global", type="primary"):
                     if cat_cad != "Selecione..." and tipo_cad != "Aguardando Categoria..." and prod_cad and tipo_cad:
-                        # Sempre mapeamos a categoria raiz do banco para manter a estrutura limpa
                         salvar_produto_nuvem(chave_db_cad, tipo_cad, prod_cad, cnpj_cad if cnpj_cad else "Sem CNPJ", status_cad)
                         st.success(f"A marca '{prod_cad}' foi adicionada à Nuvem com sucesso!")
                     else: st.error("Preencha corretamente a Categoria, o Tipo e o Nome do produto.")
 
     # --- TELA 3: NOVA FISCALIZAÇÃO ---
-    elif menu == "📝 Nova Fiscalização":
+    elif menu == "Nova Fiscalização":
         st.title("📝 Registro de Operação")
         
         if not st.session_state['fisc_ativa']:
@@ -871,7 +993,6 @@ def app():
         st.subheader(f"🏬 Loja {loja['numero']} - {loja['nome']}")
         
         with st.expander("📦 ADICIONAR INFRAÇÃO À LOJA", expanded=True):
-            # NOVO MENU MACRO COM O COMBO DE APREENSÃO E PROPAGANDA
             cat_macro = st.selectbox("Categoria Macro da Infração", [
                 "Selecione...", 
                 "💨 DEF (Dispositivos Eletrônicos para Fumar)", 
@@ -902,7 +1023,6 @@ def app():
                         todos_prods_tipo = DB_PRODUTOS[chave_db][tipo_prod]
                         prods_filtrados = []
                         
-                        # O FILTRO INVISÍVEL
                         if is_propaganda:
                             prods_filtrados = [p for p, v in todos_prods_tipo.items() if "Ilegal" not in v]
                         elif is_ilegal or is_ambos:
@@ -940,9 +1060,8 @@ def app():
                         if f1: f1_bytes = f1.getvalue()
                         if f2: f2_bytes = f2.getvalue()
 
-                        # Robô OCR
                         cnpj_extraido = ""
-                        if f2 and HAS_OCR and st.button("🤖 Tentar Auto-Preencher CNPJ (OCR)"):
+                        if f2 and HAS_OCR and st.button("🤖 Tentar Auto-Preencher CNPJ (OCR)", type="secondary"):
                             cnpj_lido = ler_cnpj_imagem(f2_bytes)
                             if cnpj_lido:
                                 st.success(f"CNPJ Encontrado na foto!")
@@ -961,7 +1080,6 @@ def app():
                                 cnpj_final = c_novo if c_novo else "Sem CNPJ"
                                 tipo_final = t_novo if t_novo else "Outros"
                                 
-                                # Define Status da Inserção Nova
                                 if is_ambos:
                                     status_final = "Ilegal/Apreensão e Propaganda"
                                     cat_limpa = "Tabaco Irregular (Sem Registro + Propaganda)"
@@ -972,9 +1090,7 @@ def app():
                                     status_final = "Ilegal/Apreensão"
                                     cat_limpa = "DEF"
                                 
-                                # Sempre salva no banco como Ilegal/Apreensão como o status raiz
                                 salvar_produto_nuvem(chave_db, tipo_final, nome_final, cnpj_final, "Ilegal/Apreensão")
-                                
                                 tipo_limpo = tipo_final.replace("🚬 ", "").replace("🕴️ ", "").replace("🌿 ", "").replace("🌾 ", "").replace("🌬️ ", "").replace("🪈 ", "")
                                 
                                 loja['itens'].append({
@@ -986,7 +1102,6 @@ def app():
                                 })
                                 st.rerun()
                         else:
-                            # Produto já existente no banco
                             if st.button("➕ Confirmar Infração"):
                                 cnpj_banco = DB_PRODUTOS[chave_db][tipo_prod][prod]
                                 
@@ -1018,14 +1133,14 @@ def app():
             df_loja = pd.DataFrame(loja['itens']).drop(columns=['Foto 1 Bytes', 'Foto 2 Bytes'], errors='ignore')
             st.dataframe(df_loja, use_container_width=True)
             
-        if st.button("🔒 Fechar Esta Loja e Registrar Log"):
+        if st.button("🔒 Fechar Esta Loja e Registrar Log", type="primary"):
             registrar_log("Inspeção de Loja Concluída", f"Fechou a Loja {loja['numero']} com {len(loja['itens'])} infrações.")
             st.session_state['fisc_ativa']['lojas'].append(st.session_state['loja_ativa'])
             st.session_state['loja_ativa'] = None
             st.rerun()
 
     # --- TELA 4: EDIÇÃO DE FISCALIZAÇÕES ---
-    elif menu == "📂 Fiscalizações Anteriores":
+    elif menu == "Histórico / Edição":
         st.title("📂 Histórico e Edição Avançada")
         st.markdown("Selecione uma operação para gerar relatórios ou editá-la. **Nota:** Alterar itens aqui e salvar sincronizará a versão corrigida com a Nuvem.")
         
@@ -1041,7 +1156,7 @@ def app():
             c_rel.download_button("📊 Baixar Excel Atualizado", data=gerar_excel(fisc_edit), file_name=f"{fisc_edit['operacao_id']}.xlsx", use_container_width=True)
             c_edit.download_button("📄 Baixar PDF Atualizado", data=gerar_pdf(fisc_edit), file_name=f"{fisc_edit['operacao_id']}.pdf", type="primary", use_container_width=True)
             
-            if c_del.button("🗑️ Excluir Operação Inteira", use_container_width=True):
+            if c_del.button("🗑️ Excluir Operação Inteira", use_container_width=True, type="secondary"):
                 if supabase_client:
                     try:
                         supabase_client.table("apreensoes").delete().eq("operacao_id", fisc_edit['operacao_id']).execute()
@@ -1150,12 +1265,11 @@ def app():
                     st.success("Operação atualizada na nuvem com sucesso!")
 
     # --- TELA 5: MONITORAMENTO (NOVA) ---
-    elif menu == "👁️ Monitoramento (Logs)":
+    elif menu == "Monitoramento (Logs)":
         st.title("👁️ Trilha de Auditoria do Sistema")
         st.markdown("Visualização de eventos, cadastros e edições em tempo real na nuvem.")
-        if st.button("🔄 Atualizar Trilha"): st.rerun()
+        if st.button("🔄 Atualizar Trilha", type="secondary"): st.rerun()
         
-        # O Dedo-Duro de Erros do Supabase
         if 'log_error' in st.session_state:
             st.error(f"⚠️ Atenção! O Supabase bloqueou a gravação do Log. Erro retornado:\n\n{st.session_state['log_error']}\n\n*Verifique se a tabela 'auditoria' foi criada e se a segurança (RLS) dela foi desativada no SQL.*")
             
