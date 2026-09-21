@@ -789,12 +789,11 @@ def app():
     global DB_PRODUTOS 
     DB_PRODUTOS = obter_banco_atualizado()
     
-    with st.sidebar:
-        # Trocamos o radio antigo pelo menu elegante com ícones
+   with st.sidebar:
         st.markdown(f"**Fiscal Ativo:** 👮 {st.session_state['nome_fiscal']}")
         st.markdown("---")
         
-       menu = option_menu(
+        menu = option_menu(
             menu_title="Painel GGTAB",
             options=["Dashboard Geral", "Consulta e Cadastro", "Nova Fiscalização", "Histórico / Edição", "Monitoramento (Logs)"],
             icons=["bar-chart-fill", "search", "clipboard-check-fill", "folder-fill", "eye-fill"],
@@ -802,7 +801,7 @@ def app():
             default_index=2,
             styles={
                 "container": {"padding": "0!important", "background-color": "transparent", "border": "none"},
-                "icon": {"color": "#00A859", "font-size": "18px"}, /* Verde ANVISA destaca bem no escuro e claro */
+                "icon": {"color": "#00A859", "font-size": "18px"}, 
                 "nav-link": {"font-size": "15px", "text-align": "left", "margin":"2px"},
                 "nav-link-selected": {"background-color": "#0A3B7C", "color": "white", "font-weight": "bold"},
             }
