@@ -6,3 +6,4 @@ Pillow
 supabase
 pytesseract
 streamlit-option-menu
+streamlit-aggrid
