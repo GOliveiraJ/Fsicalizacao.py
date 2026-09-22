@@ -8,3 +8,4 @@ pytesseract
 streamlit-option-menu
 streamlit-aggrid
 plotly
+google-generativeai
