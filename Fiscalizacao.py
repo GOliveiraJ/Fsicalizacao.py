@@ -37,6 +37,13 @@ try:
 except ImportError:
     HAS_OCR = False
 
+# Importação da Inteligência Artificial do Google
+try:
+    import google.generativeai as genai
+    HAS_GEMINI = True
+except ImportError:
+    HAS_GEMINI = False
+
 # ==========================================
 # CONFIGURAÇÃO E TEMA GOV.BR / ENTERPRISE
 # ==========================================
@@ -723,7 +730,8 @@ if 'nome_fiscal' not in st.session_state: st.session_state['nome_fiscal'] = ""
 if 'historico_operacoes' not in st.session_state: st.session_state['historico_operacoes'] = []
 if 'fisc_ativa' not in st.session_state: st.session_state['fisc_ativa'] = None
 if 'loja_ativa' not in st.session_state: st.session_state['loja_ativa'] = None
-if 'chat_ia' not in st.session_state: st.session_state['chat_ia'] = [{"role": "assistant", "content": "Olá, Fiscal. Sou a IA Jurídica da GGTAB. Pergunte-me sobre Cigarros Eletrônicos, Propaganda, Embalagens ou Apreensões de produtos sem registro."}]
+if 'chat_ia' not in st.session_state: 
+    st.session_state['chat_ia'] = [{"role": "assistant", "content": "Olá, Fiscal. Sou a IA Jurídica da GGTAB. Pergunte-me sobre Cigarros Eletrônicos, Propaganda, Embalagens ou Apreensões de produtos sem registro."}]
 
 def tela_login():
     st.title("🛡️ Portal de Fiscalização GGTAB")
@@ -866,7 +874,7 @@ def app():
                             else: status_banco, cat_limpa = "Ilegal/Apreensão", "DEF"
                             
                             st.session_state['loja_ativa']['itens'].append({
-                                "Categoria": cat_limpa, "Tipo": tipo_prod.replace("🚬 ", "").replace("🚬 ", "").replace("🕴️ ", "").replace("🌿 ", "").replace("🌾 ", "").replace("🌬️ ", "").replace("🪈 ", ""), 
+                                "Categoria": cat_limpa, "Tipo": tipo_prod.replace("🚬 ", "").replace("🕴️ ", "").replace("🌿 ", "").replace("🌾 ", "").replace("🌬️ ", "").replace("🪈 ", ""), 
                                 "Produto": prod, "Status": status_banco, "CNPJ Identificado": cnpj_banco.replace(" [Ilegal]", ""), 
                                 "Quantidade": qtd, "Hora": datetime.now().strftime('%H:%M:%S'),
                                 "Foto 1 Bytes": f1_bytes, "Foto 2 Bytes": f2_bytes
@@ -910,7 +918,6 @@ def app():
         st.title("📈 Painel Executivo de Inteligência GGTAB")
         st.markdown("Visão global consolidada. O sistema cruza os dados locais em andamento com a base nacional da Nuvem.")
         
-        # Puxa todo o histórico de fiscalizações salvos no Supabase
         dados_bi = []
         if supabase_client:
             try:
@@ -918,7 +925,6 @@ def app():
                 dados_bi.extend(resp.data)
             except Exception: pass
             
-        # Adiciona também a operação local que o fiscal está fazendo agora
         for op in st.session_state['historico_operacoes'] + ([st.session_state['fisc_ativa']] if st.session_state['fisc_ativa'] else []):
             for loja in op['lojas']:
                 for it in loja['itens']:
@@ -931,17 +937,14 @@ def app():
 
         df_bi = pd.DataFrame(dados_bi)
 
-        # Se houver dados, montar o BI completo
         if not df_bi.empty:
             total_ops = df_bi['operacao_id'].nunique()
             total_lojas = df_bi['loja'].nunique()
             total_produtos = df_bi['quantidade'].sum()
             
-            # Filtro inteligente de ilegais
             df_ilegais = df_bi[df_bi['status'].str.contains("Ilegal|Propaganda", case=False, na=False)]
             total_ilegais = df_ilegais['quantidade'].sum() if not df_ilegais.empty else 0
 
-            # LINHA 1: KPIs Principais
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Total de Operações (Histórico)", total_ops)
             c2.metric("Lojas Fiscalizadas", total_lojas)
@@ -951,10 +954,8 @@ def app():
 
             if HAS_PLOTLY:
                 col_graf1, col_graf2 = st.columns([1, 1.2])
-                
                 with col_graf1:
                     st.subheader("Distribuição Regulatória")
-                    # Agrupar por Status limpo (Regular vs Ilegal)
                     df_status = df_bi.copy()
                     df_status['Status Geral'] = df_status['status'].apply(lambda x: "Regular" if x == "Regular" else "Infração (Ilegal/Propaganda)")
                     df_pie = df_status.groupby("Status Geral")['quantidade'].sum().reset_index()
@@ -973,8 +974,7 @@ def app():
                                       color_discrete_sequence=["#0A3B7C"])
                         fig2.update_layout(yaxis={'categoryorder':'total ascending'}, margin=dict(t=30, b=0, l=0, r=0))
                         st.plotly_chart(fig2, use_container_width=True)
-                    else:
-                        st.info("Nenhuma infração registrada para gerar o ranking de produtos.")
+                    else: st.info("Nenhuma infração registrada para gerar o ranking de produtos.")
                         
                 st.markdown("---")
                 st.subheader("Mapeamento de Infrações por Tipo (DEF vs Derivados)")
@@ -983,43 +983,56 @@ def app():
                     fig3 = px.bar(df_tipo, x="tipo", y="quantidade", color="tipo", text="quantidade", color_discrete_sequence=px.colors.qualitative.Bold)
                     fig3.update_layout(margin=dict(t=30, b=0, l=0, r=0), showlegend=False)
                     st.plotly_chart(fig3, use_container_width=True)
-        else:
-            st.info("Nenhuma operação registrada na Nuvem ou na sessão atual. Inicie uma nova auditoria para popular o Dashboard.")
+        else: st.info("Nenhuma operação registrada na Nuvem ou na sessão atual. Inicie uma nova auditoria para popular o Dashboard.")
 
-    # --- TELA 2: ASSISTENTE JURÍDICO (RAG / IA SIMULADO) ---
+    # --- TELA 2: ASSISTENTE JURÍDICO (RAG / IA) ---
     elif menu == "Assistente Jurídico (IA)":
-        st.title("⚖️ Assistente Jurídico GGTAB (IA)")
-        st.markdown("Consulte instantaneamente a base legal da ANVISA para fundamentar os autos de infração.")
+        st.title("⚖️ Assistente Jurídico GGTAB (IA Avançada)")
+        st.markdown("Consulte a legislação da ANVISA. Se você tiver a Chave da API, a IA interpretará textos complexos livremente. Caso contrário, operará no modo reativo padrão.")
         
-        # Exibe o histórico do chat
+        # Exibe o histórico
         for msg in st.session_state['chat_ia']:
             with st.chat_message(msg["role"]): st.markdown(msg["content"])
 
-        # O Cérebro do RAG (Base de Conhecimento Simulado)
-        base_conhecimento = {
-            "eletronico|def|vape|pod": "**RDC nº 855/2024**: Proíbe a fabricação, a importação, a comercialização, a distribuição, o armazenamento, o transporte e a propaganda de dispositivos eletrônicos para fumar (DEF).\n\n*Ação Sugerida:* O produto carece de registro na Anvisa, sendo passível de apreensão sumária e inutilização, com base também na Lei 6.437/77.",
-            "propaganda|anuncio|cartaz|display": "**RDC nº 840/2023 & Lei 9.294/96**: É terminantemente proibida a propaganda comercial de produtos fumígenos derivados ou não do tabaco. Expositores não podem conter iluminação que destaque o produto, nem cartazes promocionais.\n\n*Ação Sugerida:* Autuação do estabelecimento por exibição irregular, mesmo que o produto seja registrado.",
-            "registro|ilegal|sem cnpj": "**RDC nº 896/2024**: Dispõe sobre o registro de produtos fumígenos derivados do tabaco. Produtos sem registro válido na Anvisa não podem ser comercializados.\n\n*Ação Sugerida:* Apreensão cautelar dos itens sem registro, fundamentada na Lei 6.437/77 por exposição à venda de produto irregular.",
-            "embalagem|advertencia": "**RDC nº 838/2023**: Exige a presença obrigatória de advertências sanitárias e imagens padronizadas pela Anvisa nas embalagens de produtos fumígenos.\n\n*Ação Sugerida:* Fiscalização de embalagem; produto em desacordo está sujeito a recolhimento."
-        }
-
-        # Caixa de texto do usuário
-        prompt = st.chat_input("Ex: 'Qual a RDC para cigarro eletrônico?'")
+        prompt = st.chat_input("Ex: 'Qual a punição para venda de pods?'")
         if prompt:
-            # Adiciona pergunta na tela
             st.session_state['chat_ia'].append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
             
-            # IA processa a resposta
-            resposta_ia = "Não encontrei uma fundamentação exata para essa palavra-chave. Tente buscar por termos como: **DEF, Propaganda, Registro ou Embalagem**."
-            prompt_limpo = prompt.lower()
-            for chave, texto in base_conhecimento.items():
-                palavras = chave.split("|")
-                if any(p in prompt_limpo for p in palavras):
-                    resposta_ia = texto
-                    break
+            # O "CÉREBRO INTELIGENTE" - Tenta a IA do Google primeiro, se falhar, usa o Motor Interno Seguro.
+            resposta_ia = ""
+            if HAS_GEMINI and "GEMINI_API_KEY" in st.secrets:
+                try:
+                    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                    instrucao = "Você é um Procurador Jurídico Especialista da GGTAB (ANVISA). Ajude os fiscais em campo com a legislação sanitária. Use a RDC 855/2024 (que proíbe Dispositivos Eletrônicos para Fumar - DEF), RDC 840/2023 (Propaganda irregular), RDC 896/2024 (Registro de produtos) e Lei 6.437/77. Responda de forma direta e profissional."
+                    model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=instrucao)
                     
-            # Adiciona resposta na tela
+                    # Converte o histórico para o formato do Gemini
+                    historico_gemini = []
+                    for m in st.session_state['chat_ia'][1:-1]:
+                        historico_gemini.append({"role": "model" if m["role"] == "assistant" else "user", "parts": [m["content"]]})
+                        
+                    chat = model.start_chat(history=historico_gemini)
+                    response = chat.send_message(prompt)
+                    resposta_ia = response.text
+                except Exception as e:
+                    resposta_ia = f"⚠️ Ocorreu um erro na IA Externa (Falha de Chave ou Conexão). Acionando o Motor Interno...\n\n"
+                    
+            if not resposta_ia or "⚠️" in resposta_ia:
+                base_conhecimento = {
+                    "eletronico|def|vape|pod": "**RDC nº 855/2024**: Proíbe a fabricação, a importação, a comercialização, a distribuição, o armazenamento, o transporte e a propaganda de dispositivos eletrônicos para fumar (DEF).\n\n*Ação Sugerida:* O produto carece de registro na Anvisa, sendo passível de apreensão sumária e inutilização, com base também na Lei 6.437/77.",
+                    "propaganda|anuncio|cartaz|display": "**RDC nº 840/2023 & Lei 9.294/96**: É terminantemente proibida a propaganda comercial de produtos fumígenos derivados ou não do tabaco. Expositores não podem conter iluminação que destaque o produto, nem cartazes promocionais.\n\n*Ação Sugerida:* Autuação do estabelecimento por exibição irregular, mesmo que o produto seja registrado.",
+                    "registro|ilegal|sem cnpj": "**RDC nº 896/2024**: Dispõe sobre o registro de produtos fumígenos derivados do tabaco. Produtos sem registro válido na Anvisa não podem ser comercializados.\n\n*Ação Sugerida:* Apreensão cautelar dos itens sem registro, fundamentada na Lei 6.437/77 por exposição à venda de produto irregular.",
+                    "embalagem|advertencia": "**RDC nº 838/2023**: Exige a presença obrigatória de advertências sanitárias e imagens padronizadas pela Anvisa nas embalagens de produtos fumígenos.\n\n*Ação Sugerida:* Fiscalização de embalagem; produto em desacordo está sujeito a recolhimento."
+                }
+                resposta_interna = "Não encontrei uma fundamentação exata no motor interno restrito. Tente buscar por termos diretos: **DEF, Propaganda, Registro ou Embalagem**."
+                prompt_limpo = prompt.lower()
+                for chave, texto in base_conhecimento.items():
+                    if any(p in prompt_limpo for p in chave.split("|")):
+                        resposta_interna = texto
+                        break
+                resposta_ia += resposta_interna
+                
             st.session_state['chat_ia'].append({"role": "assistant", "content": resposta_ia})
             with st.chat_message("assistant"): st.markdown(resposta_ia)
 
