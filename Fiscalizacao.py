@@ -998,7 +998,7 @@ def app():
             st.session_state['chat_ia'].append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
             
-            # O "CÉREBRO INTELIGENTE" - Conexão robusta e fallback atualizado para a versão 3.6
+            # O "CÉREBRO INTELIGENTE" - Tenta a IA do Google primeiro, se falhar, usa o Motor Interno Seguro.
             resposta_ia = ""
             if HAS_GEMINI and "GEMINI_API_KEY" in st.secrets:
                 try:
@@ -1009,16 +1009,19 @@ def app():
                     for m in st.session_state['chat_ia'][1:-1]:
                         historico_gemini.append({"role": "model" if m["role"] == "assistant" else "user", "parts": [m["content"]]})
                         
-                    # Atualizado com a versão exata exigida pelo Google (gemini-3.6-flash)
                     model = genai.GenerativeModel('gemini-3.6-flash', system_instruction=instrucao)
                     chat = model.start_chat(history=historico_gemini)
                     response = chat.send_message(prompt)
                     resposta_ia = response.text
 
                 except Exception as e:
-                    resposta_ia = f"⚠️ Ocorreu um erro de ligação com a IA Externa: **{str(e)}** \n\nAcionando o Motor Interno restrito...\n\n"
+                    erro_str = str(e)
+                    if "429" in erro_str:
+                        resposta_ia = "⏳ **Controle de Tráfego:** O limite de consultas por minuto da cota gratuita foi atingido (Proteção Anti-Spam do Google). Por favor, aguarde cerca de 20 segundos e envie a sua pergunta novamente."
+                    else:
+                        resposta_ia = f"⚠️ Ocorreu um erro de ligação com a IA Externa: **{erro_str}** \n\nAcionando o Motor Interno restrito...\n\n"
                     
-            if not resposta_ia or "⚠️" in resposta_ia:
+            if not resposta_ia or ("⚠️" in resposta_ia and "429" not in resposta_ia):
                 base_conhecimento = {
                     "eletronico|def|vape|pod": "**RDC nº 855/2024**: Proíbe a fabricação, a importação, a comercialização, a distribuição, o armazenamento, o transporte e a propaganda de dispositivos eletrônicos para fumar (DEF).\n\n*Ação Sugerida:* O produto carece de registro na Anvisa, sendo passível de apreensão sumária e inutilização, com base também na Lei 6.437/77.",
                     "propaganda|anuncio|cartaz|display": "**RDC nº 840/2023 & Lei 9.294/96**: É terminantemente proibida a propaganda comercial de produtos fumígenos derivados ou não do tabaco. Expositores não podem conter iluminação que destaque o produto, nem cartazes promocionais.\n\n*Ação Sugerida:* Autuação do estabelecimento por exibição irregular, mesmo que o produto seja registrado.",
