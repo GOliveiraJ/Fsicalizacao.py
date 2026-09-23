@@ -985,12 +985,11 @@ def app():
                     st.plotly_chart(fig3, use_container_width=True)
         else: st.info("Nenhuma operação registrada na Nuvem ou na sessão atual. Inicie uma nova auditoria para popular o Dashboard.")
 
-    # --- TELA 2: ASSISTENTE JURÍDICO (RAG / IA SIMULADO) ---
+    # --- TELA 2: ASSISTENTE JURÍDICO (RAG / IA) ---
     elif menu == "Assistente Jurídico (IA)":
         st.title("⚖️ Assistente Jurídico GGTAB (IA Avançada)")
         st.markdown("Consulte a legislação da ANVISA. Se você tiver a Chave da API, a IA interpretará textos complexos livremente. Caso contrário, operará no modo reativo padrão.")
         
-        # Exibe o histórico do chat
         for msg in st.session_state['chat_ia']:
             with st.chat_message(msg["role"]): st.markdown(msg["content"])
 
@@ -999,7 +998,7 @@ def app():
             st.session_state['chat_ia'].append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
             
-            # O "CÉREBRO INTELIGENTE" - Conexão robusta e fallback
+            # O "CÉREBRO INTELIGENTE" - Conexão robusta e fallback atualizado para a versão 3.6
             resposta_ia = ""
             if HAS_GEMINI and "GEMINI_API_KEY" in st.secrets:
                 try:
@@ -1010,24 +1009,11 @@ def app():
                     for m in st.session_state['chat_ia'][1:-1]:
                         historico_gemini.append({"role": "model" if m["role"] == "assistant" else "user", "parts": [m["content"]]})
                         
-                    # 1. Tentar forçar o modelo padrão mais estável
-                    modelo_escolhido = None
-                    modelos_disponiveis = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                    
-                    if 'models/gemini-1.5-pro' in modelos_disponiveis:
-                        modelo_escolhido = 'gemini-1.5-pro'
-                    elif 'models/gemini-1.5-flash' in modelos_disponiveis:
-                         modelo_escolhido = 'gemini-1.5-flash'
-                    elif modelos_disponiveis:
-                         modelo_escolhido = modelos_disponiveis[0].replace('models/', '')
-                         
-                    if modelo_escolhido:
-                         model = genai.GenerativeModel(modelo_escolhido, system_instruction=instrucao)
-                         chat = model.start_chat(history=historico_gemini)
-                         response = chat.send_message(prompt)
-                         resposta_ia = response.text
-                    else:
-                         raise Exception("Nenhum modelo compatível encontrado na sua API Key.")
+                    # Atualizado com a versão exata exigida pelo Google (gemini-3.6-flash)
+                    model = genai.GenerativeModel('gemini-3.6-flash', system_instruction=instrucao)
+                    chat = model.start_chat(history=historico_gemini)
+                    response = chat.send_message(prompt)
+                    resposta_ia = response.text
 
                 except Exception as e:
                     resposta_ia = f"⚠️ Ocorreu um erro de ligação com a IA Externa: **{str(e)}** \n\nAcionando o Motor Interno restrito...\n\n"
