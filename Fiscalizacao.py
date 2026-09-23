@@ -999,10 +999,54 @@ def app():
             st.session_state['chat_ia'].append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
             
-           # O "CÉREBRO INTELIGENTE" - Tenta a IA do Google primeiro, se falhar, usa o Motor Interno Seguro.
+           # O "CÉREBRO INTELIGENTE" - Conexão robusta e fallback
             resposta_ia = ""
             if HAS_GEMINI and "GEMINI_API_KEY" in st.secrets:
                 try:
+                    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                    instrucao = "Você é um Procurador Jurídico Especialista da GGTAB (ANVISA). Ajude os fiscais em campo com a legislação sanitária. Use a RDC 855/2024 (que proíbe Dispositivos Eletrônicos para Fumar - DEF), RDC 840/2023 (Propaganda irregular), RDC 896/2024 (Registro de produtos) e Lei 6.437/77. Responda de forma direta e profissional baseando-se nestas normativas."
+                    
+                    historico_gemini = []
+                    for m in st.session_state['chat_ia'][1:-1]:
+                        historico_gemini.append({"role": "model" if m["role"] == "assistant" else "user", "parts": [m["content"]]})
+                        
+                    # 1. Tentar forçar o modelo padrão mais estável (gemini-1.5-pro ou gemini-1.5-flash genérico)
+                    modelo_escolhido = None
+                    modelos_disponiveis = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                    
+                    # Prioridade: 1.5-pro, depois 1.5-flash, depois o primeiro que suporte gerar texto
+                    if 'models/gemini-1.5-pro' in modelos_disponiveis:
+                        modelo_escolhido = 'gemini-1.5-pro'
+                    elif 'models/gemini-1.5-flash' in modelos_disponiveis:
+                         modelo_escolhido = 'gemini-1.5-flash'
+                    elif modelos_disponiveis:
+                         modelo_escolhido = modelos_disponiveis[0].replace('models/', '')
+                         
+                    if modelo_escolhido:
+                         model = genai.GenerativeModel(modelo_escolhido, system_instruction=instrucao)
+                         chat = model.start_chat(history=historico_gemini)
+                         response = chat.send_message(prompt)
+                         resposta_ia = response.text
+                    else:
+                         raise Exception("Nenhum modelo compatível encontrado na sua API Key.")
+
+                except Exception as e:
+                    resposta_ia = f"⚠️ Ocorreu um erro de ligação com a IA Externa: **{str(e)}** \n\nAcionando o Motor Interno restrito...\n\n"
+                    
+            if not resposta_ia or "⚠️" in resposta_ia:
+                base_conhecimento = {
+                    "eletronico|def|vape|pod": "**RDC nº 855/2024**: Proíbe a fabricação, a importação, a comercialização, a distribuição, o armazenamento, o transporte e a propaganda de dispositivos eletrônicos para fumar (DEF).\n\n*Ação Sugerida:* O produto carece de registro na Anvisa, sendo passível de apreensão sumária e inutilização, com base também na Lei 6.437/77.",
+                    "propaganda|anuncio|cartaz|display": "**RDC nº 840/2023 & Lei 9.294/96**: É terminantemente proibida a propaganda comercial de produtos fumígenos derivados ou não do tabaco. Expositores não podem conter iluminação que destaque o produto, nem cartazes promocionais.\n\n*Ação Sugerida:* Autuação do estabelecimento por exibição irregular, mesmo que o produto seja registrado.",
+                    "registro|ilegal|sem cnpj": "**RDC nº 896/2024**: Dispõe sobre o registro de produtos fumígenos derivados do tabaco. Produtos sem registro válido na Anvisa não podem ser comercializados.\n\n*Ação Sugerida:* Apreensão cautelar dos itens sem registro, fundamentada na Lei 6.437/77 por exposição à venda de produto irregular.",
+                    "embalagem|advertencia": "**RDC nº 838/2023**: Exige a presença obrigatória de advertências sanitárias e imagens padronizadas pela Anvisa nas embalagens de produtos fumígenos.\n\n*Ação Sugerida:* Fiscalização de embalagem; produto em desacordo está sujeito a recolhimento."
+                }
+                resposta_interna = "Não encontrei uma fundamentação exata no motor interno restrito. Tente buscar por termos diretos: **DEF, Propaganda, Registro ou Embalagem**."
+                prompt_limpo = prompt.lower()
+                for chave, texto in base_conhecimento.items():
+                    if any(p in prompt_limpo for p in chave.split("|")):
+                        resposta_interna = texto
+                        break
+                resposta_ia += resposta_interna
                     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
                     instrucao = "Você é um Procurador Jurídico Especialista da GGTAB (ANVISA). Ajude os fiscais em campo com a legislação sanitária. Use a RDC 855/2024 (que proíbe Dispositivos Eletrônicos para Fumar - DEF), RDC 840/2023 (Propaganda irregular), RDC 896/2024 (Registro de produtos) e Lei 6.437/77. Responda de forma direta e profissional."
                     model = genai.GenerativeModel('gemini-1.5-flash', system_instruction=instrucao)
