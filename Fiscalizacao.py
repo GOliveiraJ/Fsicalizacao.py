@@ -999,7 +999,7 @@ def app():
             st.session_state['chat_ia'].append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
             
-            # O "CÉREBRO INTELIGENTE" - Tenta a IA do Google primeiro, se falhar, usa o Motor Interno Seguro.
+           # O "CÉREBRO INTELIGENTE" - Tenta a IA do Google primeiro, se falhar, usa o Motor Interno Seguro.
             resposta_ia = ""
             if HAS_GEMINI and "GEMINI_API_KEY" in st.secrets:
                 try:
