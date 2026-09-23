@@ -37,12 +37,12 @@ try:
 except ImportError:
     HAS_OCR = False
 
-# Importação da Inteligência Artificial do Google
+# Importação da Inteligência Artificial super rápida (Groq)
 try:
-    import google.generativeai as genai
-    HAS_GEMINI = True
+    import groq
+    HAS_GROQ = True
 except ImportError:
-    HAS_GEMINI = False
+    HAS_GROQ = False
 
 # ==========================================
 # CONFIGURAÇÃO E TEMA GOV.BR / ENTERPRISE
@@ -731,7 +731,7 @@ if 'historico_operacoes' not in st.session_state: st.session_state['historico_op
 if 'fisc_ativa' not in st.session_state: st.session_state['fisc_ativa'] = None
 if 'loja_ativa' not in st.session_state: st.session_state['loja_ativa'] = None
 if 'chat_ia' not in st.session_state: 
-    st.session_state['chat_ia'] = [{"role": "assistant", "content": "Olá, Fiscal. Sou a IA Jurídica da GGTAB. Pergunte-me sobre Cigarros Eletrônicos, Propaganda, Embalagens ou Apreensões de produtos sem registro."}]
+    st.session_state['chat_ia'] = [{"role": "assistant", "content": "Olá, Fiscal. Sou o Procurador Jurídico da GGTAB (via Llama 3.3). Pergunte-me sobre Cigarros Eletrônicos, Propaganda, Embalagens ou Apreensões."}]
 
 def tela_login():
     st.title("🛡️ Portal de Fiscalização GGTAB")
@@ -988,7 +988,7 @@ def app():
     # --- TELA 2: ASSISTENTE JURÍDICO (RAG / IA) ---
     elif menu == "Assistente Jurídico (IA)":
         st.title("⚖️ Assistente Jurídico GGTAB (IA Avançada)")
-        st.markdown("Consulte a legislação da ANVISA. Se você tiver a Chave da API, a IA interpretará textos complexos livremente. Caso contrário, operará no modo reativo padrão.")
+        st.markdown("Consulte a legislação da ANVISA. Sistema alimentado pelo modelo de altíssima velocidade **Llama 3.3 (Groq)**.")
         
         for msg in st.session_state['chat_ia']:
             with st.chat_message(msg["role"]): st.markdown(msg["content"])
@@ -998,30 +998,30 @@ def app():
             st.session_state['chat_ia'].append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
             
-            # O "CÉREBRO INTELIGENTE" - Tenta a IA do Google primeiro, se falhar, usa o Motor Interno Seguro.
+            # O "CÉREBRO INTELIGENTE" - Conexão robusta com o Groq (Llama 3)
             resposta_ia = ""
-            if HAS_GEMINI and "GEMINI_API_KEY" in st.secrets:
+            if HAS_GROQ and "GROQ_API_KEY" in st.secrets:
                 try:
-                    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                    client = groq.Groq(api_key=st.secrets["GROQ_API_KEY"])
                     instrucao = "Você é um Procurador Jurídico Especialista da GGTAB (ANVISA). Ajude os fiscais em campo com a legislação sanitária. Use a RDC 855/2024 (que proíbe Dispositivos Eletrônicos para Fumar - DEF), RDC 840/2023 (Propaganda irregular), RDC 896/2024 (Registro de produtos) e Lei 6.437/77. Responda de forma direta e profissional baseando-se nestas normativas."
                     
-                    historico_gemini = []
-                    for m in st.session_state['chat_ia'][1:-1]:
-                        historico_gemini.append({"role": "model" if m["role"] == "assistant" else "user", "parts": [m["content"]]})
-                        
-                    model = genai.GenerativeModel('gemini-3.6-flash', system_instruction=instrucao)
-                    chat = model.start_chat(history=historico_gemini)
-                    response = chat.send_message(prompt)
-                    resposta_ia = response.text
+                    mensagens_groq = [{"role": "system", "content": instrucao}]
+                    # Copia o histórico (ignorando a primeira saudação se necessário, mas o Groq aceita bem)
+                    for m in st.session_state['chat_ia']:
+                        if m["role"] != "system":
+                            mensagens_groq.append({"role": m["role"], "content": m["content"]})
+                            
+                    chat_completion = client.chat.completions.create(
+                        messages=mensagens_groq,
+                        model="llama-3.3-70b-versatile",
+                        temperature=0.3,
+                    )
+                    resposta_ia = chat_completion.choices[0].message.content
 
                 except Exception as e:
-                    erro_str = str(e)
-                    if "429" in erro_str:
-                        resposta_ia = "⏳ **Controle de Tráfego:** O limite de consultas por minuto da cota gratuita foi atingido (Proteção Anti-Spam do Google). Por favor, aguarde cerca de 20 segundos e envie a sua pergunta novamente."
-                    else:
-                        resposta_ia = f"⚠️ Ocorreu um erro de ligação com a IA Externa: **{erro_str}** \n\nAcionando o Motor Interno restrito...\n\n"
+                    resposta_ia = f"⚠️ Ocorreu um erro de ligação com a IA Externa (Groq): **{str(e)}** \n\nAcionando o Motor Interno restrito...\n\n"
                     
-            if not resposta_ia or ("⚠️" in resposta_ia and "429" not in resposta_ia):
+            if not resposta_ia or "⚠️" in resposta_ia:
                 base_conhecimento = {
                     "eletronico|def|vape|pod": "**RDC nº 855/2024**: Proíbe a fabricação, a importação, a comercialização, a distribuição, o armazenamento, o transporte e a propaganda de dispositivos eletrônicos para fumar (DEF).\n\n*Ação Sugerida:* O produto carece de registro na Anvisa, sendo passível de apreensão sumária e inutilização, com base também na Lei 6.437/77.",
                     "propaganda|anuncio|cartaz|display": "**RDC nº 840/2023 & Lei 9.294/96**: É terminantemente proibida a propaganda comercial de produtos fumígenos derivados ou não do tabaco. Expositores não podem conter iluminação que destaque o produto, nem cartazes promocionais.\n\n*Ação Sugerida:* Autuação do estabelecimento por exibição irregular, mesmo que o produto seja registrado.",
