@@ -1016,7 +1016,7 @@ def app():
                     response = chat.send_message(prompt)
                     resposta_ia = response.text
                 except Exception as e:
-                    resposta_ia = f"⚠️ Ocorreu um erro na IA Externa (Falha de Chave ou Conexão). Acionando o Motor Interno...\n\n"
+                    resposta_ia = f"⚠️ Ocorreu um erro na IA Externa: **{str(e)}** \n\nAcionando o Motor Interno...\n\n"
                     
             if not resposta_ia or "⚠️" in resposta_ia:
                 base_conhecimento = {
