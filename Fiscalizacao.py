@@ -731,7 +731,7 @@ if 'historico_operacoes' not in st.session_state: st.session_state['historico_op
 if 'fisc_ativa' not in st.session_state: st.session_state['fisc_ativa'] = None
 if 'loja_ativa' not in st.session_state: st.session_state['loja_ativa'] = None
 if 'chat_ia' not in st.session_state: 
-    st.session_state['chat_ia'] = [{"role": "assistant", "content": "Olá, Fiscal. Sou o Procurador Jurídico da GGTAB (via Llama 3.1). Pergunte-me sobre Cigarros Eletrônicos, Propaganda, Embalagens ou Apreensões."}]
+    st.session_state['chat_ia'] = [{"role": "assistant", "content": "Olá, Fiscal. Sou o Procurador Jurídico da GGTAB (via Llama 3.3). Pergunte-me sobre Cigarros Eletrônicos, Propaganda, Embalagens ou Apreensões."}]
 
 def tela_login():
     st.title("🛡️ Portal de Fiscalização GGTAB")
@@ -988,7 +988,7 @@ def app():
     # --- TELA 2: ASSISTENTE JURÍDICO (RAG / IA) ---
     elif menu == "Assistente Jurídico (IA)":
         st.title("⚖️ Assistente Jurídico GGTAB (IA Avançada)")
-        st.markdown("Consulte a legislação da ANVISA. Sistema alimentado pelo modelo de altíssima velocidade **Llama 3.1 (Groq)**.")
+        st.markdown("Consulte a legislação da ANVISA. Sistema alimentado pelo modelo de altíssima velocidade **Llama 3.3 (Groq)**.")
         
         for msg in st.session_state['chat_ia']:
             with st.chat_message(msg["role"]): st.markdown(msg["content"])
@@ -1011,10 +1011,10 @@ def app():
                         if m["role"] != "system":
                             mensagens_groq.append({"role": m["role"], "content": m["content"]})
                             
-                    # Usa o modelo oficial Llama 3.1 70B da Groq
+                    # Usa o modelo oficial Llama 3.3 70B da Groq
                     chat_completion = client.chat.completions.create(
                         messages=mensagens_groq,
-                        model="llama-3.1-70b-versatile",
+                        model="llama-3.3-70b-versatile",
                         temperature=0.3,
                     )
                     resposta_ia = chat_completion.choices[0].message.content
