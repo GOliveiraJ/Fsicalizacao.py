@@ -731,7 +731,7 @@ if 'historico_operacoes' not in st.session_state: st.session_state['historico_op
 if 'fisc_ativa' not in st.session_state: st.session_state['fisc_ativa'] = None
 if 'loja_ativa' not in st.session_state: st.session_state['loja_ativa'] = None
 if 'chat_ia' not in st.session_state: 
-    st.session_state['chat_ia'] = [{"role": "assistant", "content": "Olá, Fiscal. Sou o Procurador Jurídico da GGTAB (via Llama). Pergunte-me sobre Cigarros Eletrônicos, Propaganda, Embalagens ou Apreensões."}]
+    st.session_state['chat_ia'] = [{"role": "assistant", "content": "Olá, Fiscal. Sou o Procurador Jurídico da GGTAB. Pergunte-me sobre Cigarros Eletrônicos, Propaganda, Embalagens ou Apreensões."}]
 
 def tela_login():
     st.title("🛡️ Portal de Fiscalização GGTAB")
@@ -988,7 +988,7 @@ def app():
     # --- TELA 2: ASSISTENTE JURÍDICO (RAG / IA) ---
     elif menu == "Assistente Jurídico (IA)":
         st.title("⚖️ Assistente Jurídico GGTAB (IA Avançada)")
-        st.markdown("Consulte a legislação da ANVISA. O sistema conecta-se de forma dinâmica e automática ao modelo mais poderoso disponível.")
+        st.markdown("Consulte a legislação da ANVISA. Sistema alimentado por inteligência artificial conversacional.")
         
         for msg in st.session_state['chat_ia']:
             with st.chat_message(msg["role"]): st.markdown(msg["content"])
@@ -998,25 +998,25 @@ def app():
             st.session_state['chat_ia'].append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
             
-            # O "CÉREBRO INTELIGENTE" - Conexão robusta e Auto-Descoberta (Groq)
+            # O "CÉREBRO INTELIGENTE" - Conexão rigorosa para modelos de Chat
             resposta_ia = ""
             if HAS_GROQ and "GROQ_API_KEY" in st.secrets:
                 try:
                     client = groq.Groq(api_key=st.secrets["GROQ_API_KEY"])
                     instrucao = "Você é um Procurador Jurídico Especialista da GGTAB (ANVISA). Ajude os fiscais em campo com a legislação sanitária. Use a RDC 855/2024 (que proíbe Dispositivos Eletrônicos para Fumar - DEF), RDC 840/2023 (Propaganda irregular), RDC 896/2024 (Registro de produtos) e Lei 6.437/77. Responda de forma direta e profissional baseando-se nestas normativas."
                     
-                    # 1. AUTO-DESCOBERTA: Pergunta à Groq quais modelos a chave permite usar
+                    # 1. AUTO-DESCOBERTA SEGURA
                     modelos_disponiveis = [m.id for m in client.models.list().data]
                     
-                    # 2. Ordem de prioridade (do mais inteligente para o mais rápido)
+                    # 2. Ordem de prioridade segura (Apenas modelos de conversação confirmados)
                     modelo_escolhido = None
                     preferencias = [
                         "llama-3.3-70b-versatile",
-                        "llama-3.1-70b-versatile",
-                        "llama3-70b-8192",
                         "llama-3.1-8b-instant",
+                        "llama3-70b-8192",
                         "llama3-8b-8192",
-                        "mixtral-8x7b-32768"
+                        "mixtral-8x7b-32768",
+                        "gemma2-9b-it"
                     ]
                     
                     for pref in preferencias:
@@ -1024,18 +1024,15 @@ def app():
                             modelo_escolhido = pref
                             break
                             
-                    # Se falhar a lista de preferências, escolhe o primeiro Llama que encontrar
+                    # 3. Fallback rigoroso (Ignora modelos de classificação/moderação como llama-guard)
                     if not modelo_escolhido:
-                        llamas = [m for m in modelos_disponiveis if "llama" in m.lower()]
-                        if llamas:
-                            modelo_escolhido = llamas[0]
-                        elif modelos_disponiveis:
-                            modelo_escolhido = modelos_disponiveis[0]
+                        modelos_chat = [m for m in modelos_disponiveis if "guard" not in m.lower() and "whisper" not in m.lower()]
+                        if modelos_chat:
+                            modelo_escolhido = modelos_chat[0]
                         else:
-                            raise Exception("A sua chave API não tem acesso a nenhum modelo ativo no momento.")
+                            raise Exception("A sua chave API não tem acesso a modelos de conversação.")
                             
-                    # Aviso visual dinâmico (mostra na tela qual modelo a IA conectou)
-                    st.toast(f"🤖 IA conectada com sucesso via modelo: {modelo_escolhido}", icon="🤖")
+                    st.toast(f"🤖 IA conectada: {modelo_escolhido}", icon="🤖")
 
                     mensagens_groq = [{"role": "system", "content": instrucao}]
                     for m in st.session_state['chat_ia']:
