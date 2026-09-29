@@ -720,6 +720,7 @@ def gerar_pdf(fisc):
     return bytes(pdf.output())
 
 def motor_juridico_anvisa_nlp(prompt_usuario):
+    global HAS_NLP
     if not HAS_NLP or vetorizador is None:
         return "⚠️ O Motor de Inteligência Artificial Local não está instalado (Falta scikit-learn no requirements.txt). Peça à TI para atualizar o sistema."
     
