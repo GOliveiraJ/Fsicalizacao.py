@@ -579,7 +579,6 @@ DB_PRODUTOS_BASE = {
         }
     }
 }
-
 # ==========================================
 # CÉREBRO DE IA NATIVO - 100 CENÁRIOS
 # ==========================================
@@ -694,145 +693,6 @@ BASE_CONHECIMENTO_IA = [
 ]
 
 # ==========================================
-# INTEGRAÇÃO INTELIGENTE E UTILS
-# ==========================================
-def obter_banco_atualizado():
-    banco_dinamico = copy.deepcopy(DB_PRODUTOS_BASE)
-    if supabase_client:
-        try:
-            resp = supabase_client.table('produtos_customizados').select('*').execute()
-            for row in resp.data:
-                cat, tipo, prod, cnpj, status = row['categoria'], row['tipo'], row['produto'], row['cnpj'], row['status']
-                if cat in banco_dinamico:
-                    if tipo not in banco_dinamico[cat]: banco_dinamico[cat][tipo] = {}
-                    val_final = cnpj if "Ilegal" not in status else f"{cnpj} [Ilegal]"
-                    banco_dinamico[cat][tipo][prod] = val_final
-        except Exception: pass
-    return banco_dinamico
-
-def salvar_produto_nuvem(categoria, tipo, produto, cnpj, status):
-    if supabase_client:
-        try:
-            resp = supabase_client.table('produtos_customizados').select('*').eq('produto', produto).execute()
-            if not resp.data:
-                supabase_client.table('produtos_customizados').insert({
-                    "categoria": categoria, "tipo": tipo, "produto": produto, "cnpj": cnpj, "status": status
-                }).execute()
-                registrar_log("Novo Produto Cadastrado", f"A marca '{produto}' foi salva para futuras fiscalizações.")
-        except Exception: pass
-
-DB_PRODUTOS = obter_banco_atualizado()
-
-def get_cnpj_mapping():
-    mapping = {}
-    for cat, tipos in DB_PRODUTOS.items():
-        for tipo, produtos in tipos.items():
-            for prod, cnpj in produtos.items():
-                cnpj_limpo = re.sub(r'\D', '', cnpj) 
-                if len(cnpj_limpo) > 10: mapping[cnpj_limpo] = prod
-    return mapping
-CNPJ_TO_PRODUTO = get_cnpj_mapping()
-
-def clean_text_for_pdf(text):
-    if not text: return text
-    return text.encode('latin-1', 'ignore').decode('latin-1')
-
-def ler_cnpj_imagem(imagem_bytes):
-    if not HAS_OCR: return None
-    try:
-        img = Image.open(io.BytesIO(imagem_bytes))
-        texto = pytesseract.image_to_string(img)
-        numeros = re.sub(r'\D', '', texto)
-        for cnpj_banco in CNPJ_TO_PRODUTO.keys():
-            if cnpj_banco in numeros: return cnpj_banco
-        return None
-    except Exception: return None
-
-def obter_fundamentacao_legal(categoria, status):
-    fundamentos = []
-    if "DEF" in categoria: 
-        fundamentos.append("RDC nº 855/2024 e Lei 6.437/77 (Comercialização de DEF)")
-    else:
-        if "Propaganda" in categoria or "Propaganda" in status: 
-            fundamentos.append("RDC nº 840/2023 e Lei 9.294/96 (Propaganda Irregular)")
-        if "Ilegal" in status or "Apreensão" in categoria or "Nao Registrado" in status: 
-            fundamentos.append("RDC nº 896/2024 e Lei 6.437/77 (Produto Sem Registro)")
-    if not fundamentos: fundamentos.append("Amostragem / RDC nº 838/2023 (Fiscalização de Embalagem)")
-    return " | ".join(fundamentos)
-
-def gerar_excel(fisc):
-    flat_data = []
-    for loja in fisc['lojas']:
-        for item in loja['itens']:
-            flat_item = item.copy()
-            flat_item['Loja'] = f"Loja {loja['numero']} - {loja['nome']}"
-            flat_data.append(flat_item)
-    df = pd.DataFrame(flat_data)
-    if not df.empty: df = df.drop(columns=['Foto 1 Bytes', 'Foto 2 Bytes'], errors='ignore')
-    out = io.BytesIO()
-    with pd.ExcelWriter(out, engine='openpyxl') as w:
-        if df.empty: df.to_excel(w, index=False, sheet_name='Sem_Apreensoes')
-        else:
-            for lname in df['Loja'].unique():
-                aba = ''.join(c for c in clean_text_for_pdf(lname) if c.isalnum() or c.isspace() or c == '-').strip()[:31] or "Loja"
-                df[df['Loja'] == lname].to_excel(w, index=False, sheet_name=aba)
-    return out.getvalue()
-
-def gerar_pdf(fisc):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("helvetica", style="B", size=15)
-    pdf.cell(0, 10, clean_text_for_pdf("Auto de Inspecao e Apreensao - GGTAB/ANVISA"), ln=True, align='C')
-    pdf.set_font("helvetica", size=9)
-    pdf.cell(0, 8, clean_text_for_pdf(f"Operacao: {fisc.get('operacao_id', 'Local')} | Fiscal: {st.session_state['nome_fiscal']}"), ln=True, align='C')
-    pdf.line(10, 28, 200, 28)
-    pdf.ln(8)
-    
-    if not fisc['lojas']: pdf.cell(0, 10, "Nenhuma loja fiscalizada nesta operacao.", ln=True)
-    else:
-        for loja in fisc['lojas']:
-            pdf.set_font("helvetica", style="B", size=13)
-            pdf.set_text_color(0, 51, 102)
-            pdf.cell(0, 10, clean_text_for_pdf(f"Estabelecimento: Loja {loja['numero']} - {loja['nome']}"), ln=True)
-            pdf.set_text_color(0, 0, 0)
-            if not loja['itens']:
-                pdf.set_font("helvetica", style="I", size=10)
-                pdf.cell(0, 6, "Nenhum item apreendido.", ln=True)
-                pdf.ln(4)
-                continue
-            for item in loja['itens']:
-                pdf.set_font("helvetica", style="B", size=11)
-                pdf.cell(0, 7, clean_text_for_pdf(f"Item: {item['Produto']} (Hora: {item['Hora']})"), ln=True)
-                pdf.set_font("helvetica", size=10)
-                pdf.cell(0, 6, clean_text_for_pdf(f"Categoria: {item['Categoria']} | Tipo: {item['Tipo']}"), ln=True)
-                
-                qtd_str = f"Qtd: {item['Quantidade']} und. | Status: {item['Status']}"
-                if "Propaganda" in item['Categoria'] or "Propaganda" in item['Status']: 
-                    qtd_str = f"Peças Publicitárias / Qtd: {item['Quantidade']} | Status: {item['Status']}"
-                    
-                pdf.cell(0, 6, clean_text_for_pdf(qtd_str), ln=True)
-                pdf.set_font("helvetica", style="B", size=10)
-                pdf.cell(0, 6, clean_text_for_pdf(f"CNPJ / Lote: {item['CNPJ Identificado'].replace(' [Ilegal]', '')}"), ln=True)
-                
-                fund = obter_fundamentacao_legal(item['Categoria'], item['Status'])
-                pdf.set_font("helvetica", style="I", size=9)
-                pdf.set_text_color(200, 0, 0) if ("Ilegal" in item['Status'] or "Propaganda" in item['Status']) else pdf.set_text_color(0, 100, 0)
-                pdf.cell(0, 6, clean_text_for_pdf(f"Fundamentação Legal: {fund}"), ln=True)
-                pdf.set_text_color(0, 0, 0) 
-                
-                foto1, foto2 = item.get('Foto 1 Bytes'), item.get('Foto 2 Bytes')
-                if foto1 or foto2:
-                    pdf.ln(2)
-                    if pdf.get_y() > 230: pdf.add_page()
-                    x_offset = 10
-                    if foto1: pdf.image(io.BytesIO(foto1), x=x_offset, y=pdf.get_y(), w=50); x_offset += 60 
-                    if foto2: pdf.image(io.BytesIO(foto2), x=x_offset, y=pdf.get_y(), w=50)
-                pdf.ln(55) 
-                pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-                pdf.ln(4)
-    return bytes(pdf.output())
-
-# ==========================================
 # CÉREBRO DE IA NATIVO - CACHE ESTRUTURADO
 # ==========================================
 @st.cache_resource
@@ -855,26 +715,60 @@ def motor_juridico_anvisa_nlp(prompt_usuario):
     
     pergunta = prompt_usuario.lower()
     
-    # --- FASE 1: BUSCA ATIVA DE MARCAS NO BANCO DE DADOS (CNPJ) ---
+    # --- FASE 1: BUSCA ATIVA DE MARCAS E CNPJs NO BANCO DE DADOS ---
     marcas_encontradas = []
-    palavras_pergunta = [p for p in re.findall(r'\b\w+\b', pergunta) if len(p) > 2]
+    palavras_pergunta = set(re.findall(r'\b\w+\b', pergunta))
+    numeros_pergunta = re.sub(r'\D', '', pergunta)
+    
+    # Palavras que devem ser ignoradas para não dar falsos positivos de marcas
+    palavras_ignoradas = {'para', 'com', 'sabor', 'menta', 'azul', 'blue', 'red', 'gold', 'silver', 'black', 'white', 'classic', 'original', 'ice', 'mix', 'fresh', 'blend', 'tradicional', 'slim', 'slims', 'premium', 'edition', 'double', 'menthol', 'cherry', 'grape', 'mint'}
     
     for cat, tipos in DB_PRODUTOS.items():
         for tipo, produtos in tipos.items():
             for prod, cnpj in produtos.items():
                 prod_lower = prod.lower()
-                if prod_lower in pergunta or any(p in prod_lower.split() for p in palavras_pergunta if p in ['ignite', 'elfbar', 'waka', 'zomo', 'marlboro', 'kumbaya', 'nay', 'adalya', 'kent', 'dunhill']):
-                    status_str = "✅ REGISTRADO" if "Ilegal" not in cnpj else "❌ ILEGAL / APREENSÃO"
-                    marcas_encontradas.append(f"- **{prod}** ({tipo}) -> {status_str} (CNPJ: {cnpj})")
-    
-    marcas_encontradas = list(set(marcas_encontradas))
+                cnpj_numeros = re.sub(r'\D', '', cnpj)
+                
+                match_nome = False
+                
+                # Regra 1: Nome do produto inteirinho na pergunta
+                if len(prod_lower) > 3 and prod_lower in pergunta:
+                    match_nome = True
+                else:
+                    # Regra 2: Verifica palavras-chave fortes do nome do produto
+                    termos_produto = set(re.findall(r'\b\w+\b', prod_lower))
+                    termos_fortes = {t for t in termos_produto if len(t) > 3 and t not in palavras_ignoradas}
+                    if termos_fortes.intersection(palavras_pergunta):
+                        match_nome = True
+                        
+                # Regra 3: Match pelo CNPJ exato
+                match_cnpj = False
+                if len(numeros_pergunta) >= 11 and cnpj_numeros and cnpj_numeros in numeros_pergunta:
+                    match_cnpj = True
+                    
+                if match_nome or match_cnpj:
+                    status_str = "✅ REGISTRADO (Permitido)" if "Ilegal" not in cnpj else "❌ ILEGAL (Apreensão)"
+                    marcas_encontradas.append(f"📦 **Produto:** {prod}\n   - **CNPJ:** {cnpj}\n   - **Status:** {status_str}")
+                    
+    marcas_unicas = list(set(marcas_encontradas))
     texto_banco = ""
     
-    if marcas_encontradas:
-        texto_banco = "🔍 **Consulta Automática no Banco de Produtos:**\n" + "\n".join(marcas_encontradas) + "\n\n---\n**⚖️ Parecer do Motor Jurídico:**\n\n"
-    elif any(termo in pergunta for termo in ["marca", "produto", "legal", "vender", "registrado", "ilegal", "pode vender"]):
-        texto_banco = "🔍 **Consulta Automática:** Nenhuma marca correspondente foi encontrada no banco de dados oficial ativo.\n\n*⚠ NOTA DE FISCALIZAÇÃO: Todo e qualquer produto fumígeno (derivado do tabaco ou DEF) que não possui registro ativo na ANVISA é considerado ILEGAL e deve ser alvo de apreensão imediata.*\n\n---\n**⚖️ Parecer do Motor Jurídico:**\n\n"
+    # Gatilhos que indicam que o fiscal quer consultar um produto
+    gatilhos_busca = {"marca", "produto", "cnpj", "registro", "registrado", "ilegal", "legal", "vender", "vende", "pod", "vape", "cigarro", "essencia"}
     
+    if marcas_unicas:
+        if len(marcas_unicas) > 5:
+            exibidas = "\n\n".join(marcas_unicas[:5])
+            exibidas += f"\n\n- *(... e mais {len(marcas_unicas) - 5} produtos associados a esta pesquisa)*"
+        else:
+            exibidas = "\n\n".join(marcas_unicas)
+            
+        texto_banco = "### 🔍 Consulta Ativa no Banco GGTAB\n" + exibidas + "\n\n---\n### ⚖️ Base Legal e Diretrizes\n\n"
+        
+    elif gatilhos_busca.intersection(palavras_pergunta):
+        # O fiscal perguntou de um produto que não existe no banco!
+        texto_banco = "### 🔍 Consulta Ativa no Banco GGTAB\n⚠️ **ALERTA VERMELHO:** Nenhuma marca, produto ou CNPJ correspondente foi encontrado na lista oficial de registrados da ANVISA.\n\n*Diretriz:* Todo produto fumígeno que não consta no banco de dados ativo é considerado **CLANDESTINO/ILEGAL** e deve ser objeto de apreensão imediata e autuação do estabelecimento.\n\n---\n### ⚖️ Base Legal e Diretrizes\n\n"
+        
     # --- FASE 2: BUSCA SEMÂNTICA RAG (OS 100 CENÁRIOS) ---
     vetor_usuario = vetorizador.transform([pergunta])
     similaridades = cosine_similarity(vetor_usuario, matriz_tfidf).flatten()
@@ -882,8 +776,8 @@ def motor_juridico_anvisa_nlp(prompt_usuario):
     indice_vencedor = similaridades.argmax()
     pontuacao = similaridades[indice_vencedor]
     
-    if pontuacao < 0.10:
-        resposta_nlp = "Desculpe, não consegui associar a sua pergunta a um artigo específico da legislação federal.\n\nPor favor, tente perguntar de forma mais direta utilizando termos-chave, como: **Vape é ilegal?**, **Propaganda na parede**, **Falta de nota fiscal**, **Multa para pod**, ou **Produto importado**."
+    if pontuacao < 0.08: # Tolerância fina para não dar falsos positivos
+        resposta_nlp = "Não consegui associar a sua pergunta a um artigo específico da legislação ou a uma diretriz de campo.\n\nTente usar termos-chave como: **Vape, Propaganda, CNPJ, Registro, Contrabando, Multa, Embalagem, Escondido, Menor de idade**."
     else:
         resposta_nlp = BASE_CONHECIMENTO_IA[indice_vencedor]['resposta']
         
@@ -899,7 +793,7 @@ if 'historico_operacoes' not in st.session_state: st.session_state['historico_op
 if 'fisc_ativa' not in st.session_state: st.session_state['fisc_ativa'] = None
 if 'loja_ativa' not in st.session_state: st.session_state['loja_ativa'] = None
 if 'chat_ia' not in st.session_state: 
-    st.session_state['chat_ia'] = [{"role": "assistant", "content": "Olá! Sou o **Motor Jurídico da ANVISA (Offline)**. 🇧🇷 \n\nTenho 100 cenários de inteligência gravados e acesso imediato ao Banco de Produtos GGTAB.\n\nExperimente perguntar algo como: *'Vender Zomo Vape é legal?'*, *'Achei pod escondido na gaveta'* ou *'Qual a multa para quem faz propaganda?'*"}]
+    st.session_state['chat_ia'] = [{"role": "assistant", "content": "Olá! Sou o **Motor Jurídico Híbrido da ANVISA (Offline)**. 🇧🇷 \n\nPossuo 100 cenários de fiscalização na memória e rastreio automático no Banco de Produtos GGTAB.\n\nExperimente perguntar:\n- *'O Pod Ignite tem registro?'*\n- *'Cigarro San Marino é legal?'*\n- *'O CNPJ 33.009.911/0001-39 está regular?'*\n- *'Achei produto escondido no caixa, qual a multa?'*"}]
 
 def tela_login():
     st.title("🛡️ Portal de Fiscalização GGTAB")
@@ -1026,7 +920,7 @@ def app():
                             cat_limpa = "Tabaco Irregular (Sem Registro + Propaganda)" if is_ambos else ("Tabaco Irregular (Sem Registro)" if is_ilegal else "DEF")
                             
                             st.session_state['loja_ativa']['itens'].append({
-                                "Categoria": cat_limpa, "Tipo": tipo_final.replace("🚬 ", "").replace("🕴️ ", "").replace("🌿 ", "").replace("🌾 ", "").replace("🌬️ ", "").replace("🪈 ", ""), 
+                                "Categoria": cat_limpa, "Tipo": tipo_final.replace("🚬 ", "").replace("🕴️ ", "").replace("🌿 ", "").replace("🌾 ", "").replace("🌬 ", "").replace("🪈 ", ""), 
                                 "Produto": nome_final, "Status": status_final, "CNPJ Identificado": cnpj_final, 
                                 "Quantidade": qtd, "Hora": datetime.now().strftime('%H:%M:%S'),
                                 "Foto 1 Bytes": f1_bytes, "Foto 2 Bytes": f2_bytes
@@ -1156,17 +1050,17 @@ def app():
     # --- TELA 2: ASSISTENTE JURÍDICO NLP (NATIVO E OFFLINE) ---
     elif menu == "Assistente Jurídico (IA)":
         st.title("⚖ Assistente Jurídico GGTAB")
-        st.markdown("Motor de Machine Learning Local. **Velocidade ultra-rápida, 100 cenários blindados e sem dependência de internet externa.**")
+        st.markdown("Motor de Inteligência Artificial Híbrido. **Faz leitura direta da Base de CNPJs e cruza com a Legislação Sanitária.**")
         
         for msg in st.session_state['chat_ia']:
             with st.chat_message(msg["role"]): st.markdown(msg["content"])
 
-        prompt = st.chat_input("Ex: 'Achei pod Elfbar escondido. Qual a multa?'")
+        prompt = st.chat_input("Ex: 'A marca Ignite tem registro?' ou 'Qual a lei para vender vape?'")
         if prompt:
             st.session_state['chat_ia'].append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
             
-            # Chama o Motor Matemático Local Integrado
+            # Chama o Motor Matemático Local Integrado com Busca de Banco
             resposta_ia = motor_juridico_anvisa_nlp(prompt)
                 
             st.session_state['chat_ia'].append({"role": "assistant", "content": resposta_ia})
