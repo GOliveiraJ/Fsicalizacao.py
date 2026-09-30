@@ -800,7 +800,7 @@ BASE_CONHECIMENTO_IA = [
     {"pergunta": "Afixar cartaz de proibição para menores é lei?", "tags": "cartaz aviso lei menor visivel", "resposta": "✅ **Sim.** A legislação federal (ECA e Lei Antifumo) e resoluções da Anvisa obrigam a afixação de avisos legíveis: 'Proibida a Venda a Menores de 18 Anos'."},
     {"pergunta": "IQOS e Heets é cigarro normal ou eletrônico?", "tags": "tabaco aquecido iqos heets hnb", "resposta": "São classificados como **Tabaco Aquecido (Heat-not-Burn)**, que é uma subcategoria dos DEFs. Portanto, a venda de aparelhos IQOS e refis Heets/Terea está totalmente proibida pela RDC 855/2024."},
     {"pergunta": "Venda de cigarros estrangeiros legalizados (Duty Free).", "tags": "estrangeiro importado duty free alfandega", "resposta": "A venda fora das zonas francas só é permitida se a marca possuir registro no Brasil e maço nacionalizado (com advertência em português). Vender pacote Duty Free em loja de rua é crime."},
-    {"pergunta": "O que fazer se a marca não constar no Banco de Dados?", "tags": "marca nao ta no banco desconhecida", "resposta": "O Banco de Produtos é a Bíblia do Fiscal. Se uma marca de tabaco tradicional não estiver na lista de produtos registrados (seja por busca na IA ou na tabela), ela é classificada automaticamente como ILEGAL e deve ser apreendida."},
+    {"pergunta": "O que fazer se a marca não constar no Banco de Dados?", "tags": "marca nao ta no banco desconhecida", "resposta": "O Banco de Produtos é a Bíblia do Fiscal. Se uma marca de tabaco tradicional não estiver na lista de produtos registrados, ela é classificada automaticamente como ILEGAL e deve ser apreendida."},
     {"pergunta": "Cigarro San Marino e Eight é sempre ilegal?", "tags": "san marino eight contrabando falsificacao", "resposta": "A esmagadora maioria no mercado popular é contrabando paraguaio sem registro. Para ser legal, tem que ter o selo do IPI do Brasil e as fotos de advertência chocante em português no verso."},
     {"pergunta": "Farmácias podem vender cigarro?", "tags": "farmacia drogaria remedio vender", "resposta": "❌ **Absolutamente Proibido.** A RDC nº 44/2009 proíbe qualquer farmácia ou drogaria de comercializar produtos alheios à saúde, sendo expressamente banida a venda de cigarros nestes locais sob pena de cassação do alvará."},
 
@@ -848,7 +848,7 @@ def carregar_motor_ia():
         return None, None
 
 def motor_juridico_anvisa_nlp(prompt_usuario):
-    global HAS_NLP
+    global HAS_NLP, vetorizador, matriz_tfidf
     vetorizador, matriz_tfidf = carregar_motor_ia()
     
     if vetorizador is None or matriz_tfidf is None:
@@ -856,65 +856,106 @@ def motor_juridico_anvisa_nlp(prompt_usuario):
     
     pergunta = prompt_usuario.lower()
     
-    # --- FASE 1: BUSCA ATIVA DE MARCAS E CNPJs NO BANCO DE DADOS ---
-    marcas_encontradas = []
-    palavras_pergunta = set(re.findall(r'\b\w+\b', pergunta))
-    numeros_pergunta = re.sub(r'\D', '', pergunta)
+    # Limpa a pontuação para ler o CNPJ corretamente
+    prompt_limpo = pergunta.replace(".", "").replace("/", "").replace("-", "")
+    numeros_pergunta = re.sub(r'\D', '', prompt_limpo)
+    palavras_pergunta = [p for p in re.findall(r'\b\w+\b', pergunta) if len(p) > 3]
     
-    palavras_ignoradas = {'para', 'com', 'sabor', 'menta', 'azul', 'blue', 'red', 'gold', 'silver', 'black', 'white', 'classic', 'original', 'ice', 'mix', 'fresh', 'blend', 'tradicional', 'slim', 'slims', 'premium', 'edition', 'double', 'menthol', 'cherry', 'grape', 'mint'}
+    # Palavras que não devem ser usadas para buscar empresas (para evitar falso positivo)
+    palavras_ignoradas = {'para', 'com', 'sabor', 'menta', 'azul', 'blue', 'red', 'gold', 'silver', 'black', 'white', 'classic', 'original', 'ice', 'mix', 'fresh', 'blend', 'tradicional', 'slim', 'slims', 'premium', 'edition', 'double', 'menthol', 'cherry', 'grape', 'mint', 'qual', 'como', 'onde', 'tem', 'esse', 'este', 'esta', 'aqui', 'pode', 'vender', 'legal', 'ilegal', 'cnpj', 'empresa', 'marca', 'produto', 'registro', 'registrado'}
+
+    # --- FASE 1: DESCOBRIR QUAIS EMPRESAS OU CNPJS FORAM DIGITADOS ---
+    cnpjs_alvo = set()
+    empresas_alvo_ilegais = set()
     
     for cat, tipos in DB_PRODUTOS.items():
         for tipo, produtos in tipos.items():
-            for prod, cnpj in produtos.items():
-                prod_lower = prod.lower()
-                cnpj_numeros = re.sub(r'\D', '', cnpj)
+            for prod_full, cnpj in produtos.items():
+                cnpj_num = re.sub(r'\D', '', cnpj)
                 
-                match_nome = False
+                # Separa marca e fabricante
+                match_parenteses = re.match(r'^(.*?)\s*\((.*?)\)$', prod_full)
+                marca = match_parenteses.group(1).strip().lower() if match_parenteses else prod_full.lower()
+                empresa = match_parenteses.group(2).strip().lower() if match_parenteses else ""
+                empresa_limpa = empresa.replace(" ltda", "").replace(" eireli", "").replace(" s.a.", "").replace(" - me", "").replace(".", "").strip()
+
+                is_match = False
                 
-                if len(prod_lower) > 3 and prod_lower in pergunta:
-                    match_nome = True
+                # 1. Bateu o CNPJ? (pelo menos 8 digitos em comum)
+                if len(numeros_pergunta) >= 8 and cnpj_num and (numeros_pergunta in cnpj_num or cnpj_num in numeros_pergunta):
+                    is_match = True
                 else:
-                    termos_produto = set(re.findall(r'\b\w+\b', prod_lower))
-                    termos_fortes = {t for t in termos_produto if len(t) > 3 and t not in palavras_ignoradas}
-                    if termos_fortes.intersection(palavras_pergunta):
-                        match_nome = True
-                        
-                match_cnpj = False
-                if len(numeros_pergunta) >= 11 and cnpj_numeros and cnpj_numeros in numeros_pergunta:
-                    match_cnpj = True
-                    
-                if match_nome or match_cnpj:
-                    status_str = "✅ REGISTRADO (Permitido)" if "Ilegal" not in cnpj else "❌ ILEGAL (Apreensão)"
-                    marcas_encontradas.append(f"📦 **Produto:** {prod}\n   - **CNPJ:** {cnpj}\n   - **Status:** {status_str}")
-                    
-    marcas_unicas = list(set(marcas_encontradas))
+                    # 2. Bateu nome da Marca ou Empresa?
+                    for p in palavras_pergunta:
+                        if p not in palavras_ignoradas:
+                            if p in marca.split() or (empresa_limpa and p in empresa_limpa.split()):
+                                is_match = True
+                                break
+                                
+                if is_match:
+                    if "Ilegal" not in cnpj:
+                        cnpjs_alvo.add(cnpj)
+                    else:
+                        empresas_alvo_ilegais.add(marca)
+
+    # --- FASE 2: COLETAR TODOS OS PRODUTOS DAS EMPRESAS ALVO ---
+    empresas_encontradas = {}
+    for cat, tipos in DB_PRODUTOS.items():
+        for tipo, produtos in tipos.items():
+            for prod_full, cnpj in produtos.items():
+                match_parenteses = re.match(r'^(.*?)\s*\((.*?)\)$', prod_full)
+                marca_exibicao = match_parenteses.group(1).strip() if match_parenteses else prod_full
+                empresa_exibicao = match_parenteses.group(2).strip() if match_parenteses else "Marca Independente"
+                
+                # Se esse produto pertence a um CNPJ que foi rastreado na Fase 1, adicione-o ao Dossiê
+                if cnpj in cnpjs_alvo or marca_exibicao.lower() in empresas_alvo_ilegais:
+                    chave = cnpj if "Ilegal" not in cnpj else marca_exibicao
+                    if chave not in empresas_encontradas:
+                        status_str = "✅ EMPRESA REGISTRADA" if "Ilegal" not in cnpj else "❌ PRODUTO ILEGAL (Apreensão)"
+                        empresas_encontradas[chave] = {
+                            "empresa_display": empresa_exibicao if "Ilegal" not in cnpj else "Fabricante Clandestino",
+                            "cnpj_display": cnpj,
+                            "status": status_str,
+                            "produtos": []
+                        }
+                    empresas_encontradas[chave]["produtos"].append(f"- **{marca_exibicao}** ({tipo})")
+
+    # --- FORMATAR O DOSSIÊ DA EMPRESA ---
     texto_banco = ""
-    
-    gatilhos_busca = {"marca", "produto", "cnpj", "registro", "registrado", "ilegal", "legal", "vender", "vende", "pod", "vape", "cigarro", "essencia"}
-    
-    if marcas_unicas:
-        if len(marcas_unicas) > 5:
-            exibidas = "\n\n".join(marcas_unicas[:5])
-            exibidas += f"\n\n- *(... e mais {len(marcas_unicas) - 5} produtos associados a esta pesquisa)*"
-        else:
-            exibidas = "\n\n".join(marcas_unicas)
+    if empresas_encontradas:
+        texto_banco = "### 🏢 Dossiê Corporativo (Banco GGTAB)\n\n"
+        for chave, dados in empresas_encontradas.items():
+            texto_banco += f"**Origem/Fabricante:** {dados['empresa_display']}\n"
+            texto_banco += f"**CNPJ Vinculado:** {dados['cnpj_display']}\n"
+            texto_banco += f"**Status Global:** {dados['status']}\n"
+            texto_banco += f"**Portfólio de Produtos ({len(dados['produtos'])}):**\n" 
             
-        texto_banco = "### 🔍 Consulta Ativa no Banco GGTAB\n" + exibidas + "\n\n---\n### ⚖️ Base Legal e Diretrizes\n\n"
+            # Se a empresa tiver muitos produtos (ex: Souza Cruz), corta em 10 para não lotar a tela
+            if len(dados['produtos']) > 15:
+                texto_banco += "\n".join(dados['produtos'][:15]) + f"\n- *(... e mais {len(dados['produtos']) - 15} produtos registrados no sistema)*\n\n"
+            else:
+                texto_banco += "\n".join(dados['produtos']) + "\n\n"
+        texto_banco += "---\n"
         
-    elif gatilhos_busca.intersection(palavras_pergunta):
-        texto_banco = "### 🔍 Consulta Ativa no Banco GGTAB\n⚠️ **ALERTA VERMELHO:** Nenhuma marca, produto ou CNPJ correspondente foi encontrado na lista oficial de registrados da ANVISA.\n\n*Diretriz:* Todo produto fumígeno que não consta no banco de dados ativo é considerado **CLANDESTINO/ILEGAL** e deve ser alvo de apreensão imediata e autuação do estabelecimento.\n\n---\n### ⚖️ Base Legal e Diretrizes\n\n"
+    elif len(numeros_pergunta) >= 11 or any(termo in pergunta for termo in ["cnpj", "empresa", "fabricante"]):
+        texto_banco = "### 🔍 Consulta Ativa no Banco de Dados\n🚨 **ALERTA VERMELHO:** O CNPJ ou a Empresa pesquisada NÃO CONSTA no banco oficial da ANVISA.\n\n*Diretriz de Campo:* Todo produto fumígeno atrelado a essa origem é considerado **CLANDESTINO/ILEGAL** e deve ser apreendido sumariamente.\n\n---\n"
     
-    # --- FASE 2: BUSCA SEMÂNTICA RAG (OS 100 CENÁRIOS) ---
+    # --- FASE 3: BUSCA SEMÂNTICA RAG (AS 100 LEIS) ---
     vetor_usuario = vetorizador.transform([pergunta])
     similaridades = cosine_similarity(vetor_usuario, matriz_tfidf).flatten()
     
     indice_vencedor = similaridades.argmax()
     pontuacao = similaridades[indice_vencedor]
     
-    if pontuacao < 0.08: 
-        resposta_nlp = "Não consegui associar a sua pergunta a um artigo específico da legislação ou a uma diretriz de campo.\n\nTente usar termos-chave como: **Vape, Propaganda, CNPJ, Registro, Contrabando, Multa, Embalagem, Escondido, Menor de idade**."
+    resposta_nlp = ""
+    # Se o fiscal não perguntou sobre lei, e só queria ver os produtos, o robô fica em silêncio legal.
+    if pontuacao < 0.12:
+        if empresas_encontradas or "ALERTA VERMELHO" in texto_banco:
+            resposta_nlp = "*Nenhuma infração ou dúvida legal específica foi identificada na sua frase. Exibindo apenas a ficha da empresa acima.*"
+        else:
+            resposta_nlp = "Não consegui associar a sua pergunta a um artigo da legislação.\n\nTente usar termos como: **Vape, Propaganda, CNPJ, Registro, Contrabando, Multa, Embalagem, Escondido, Menor de idade**."
     else:
-        resposta_nlp = BASE_CONHECIMENTO_IA[indice_vencedor]['resposta']
+        resposta_nlp = "### ⚖️ Parecer do Motor Jurídico:\n\n" + BASE_CONHECIMENTO_IA[indice_vencedor]['resposta']
         
     return texto_banco + resposta_nlp
 
@@ -928,7 +969,7 @@ if 'historico_operacoes' not in st.session_state: st.session_state['historico_op
 if 'fisc_ativa' not in st.session_state: st.session_state['fisc_ativa'] = None
 if 'loja_ativa' not in st.session_state: st.session_state['loja_ativa'] = None
 if 'chat_ia' not in st.session_state: 
-    st.session_state['chat_ia'] = [{"role": "assistant", "content": "Olá! Sou o **Motor Jurídico Híbrido da ANVISA (Offline)**. 🇧🇷 \n\nPossuo 100 cenários de fiscalização na memória e rastreio automático no Banco de Produtos GGTAB.\n\nExperimente perguntar:\n- *'O Pod Ignite tem registro?'*\n- *'Cigarro San Marino é legal?'*\n- *'O CNPJ 33.009.911/0001-39 está regular?'*\n- *'Achei produto escondido no caixa, qual a multa?'*"}]
+    st.session_state['chat_ia'] = [{"role": "assistant", "content": "Olá! Sou o **Motor Jurídico Híbrido da ANVISA (Offline)**. 🇧🇷 \n\nPossuo 100 cenários de fiscalização na memória e rastreio automático no Banco de Produtos GGTAB.\n\nExperimente perguntar:\n- *'O Pod Ignite tem registro?'*\n- *'Cigarro San Marino é legal?'*\n- *'Os produtos do CNPJ 33.009.911/0001-39 estão regulares?'*\n- *'Achei produto escondido no caixa, qual a multa?'*"}]
 
 def tela_login():
     st.title("🛡️ Portal de Fiscalização GGTAB")
@@ -1055,7 +1096,7 @@ def app():
                             cat_limpa = "Tabaco Irregular (Sem Registro + Propaganda)" if is_ambos else ("Tabaco Irregular (Sem Registro)" if is_ilegal else "DEF")
                             
                             st.session_state['loja_ativa']['itens'].append({
-                                "Categoria": cat_limpa, "Tipo": tipo_final.replace("🚬 ", "").replace("🕴️ ", "").replace("🌿 ", "").replace("🌾 ", "").replace("🌬️️ ", "").replace("🪈 ", ""), 
+                                "Categoria": cat_limpa, "Tipo": tipo_final.replace("🚬 ", "").replace("🕴️ ", "").replace("🌿 ", "").replace("🌾 ", "").replace("🌬 ", "").replace("🪈 ", ""), 
                                 "Produto": nome_final, "Status": status_final, "CNPJ Identificado": cnpj_final, 
                                 "Quantidade": qtd, "Hora": datetime.now().strftime('%H:%M:%S'),
                                 "Foto 1 Bytes": f1_bytes, "Foto 2 Bytes": f2_bytes
@@ -1190,7 +1231,7 @@ def app():
         for msg in st.session_state['chat_ia']:
             with st.chat_message(msg["role"]): st.markdown(msg["content"])
 
-        prompt = st.chat_input("Ex: 'A marca Ignite tem registro?' ou 'Qual a lei para vender vape?'")
+        prompt = st.chat_input("Ex: 'A marca Ignite tem registro?' ou 'Quais os produtos da Souza Cruz?'")
         if prompt:
             st.session_state['chat_ia'].append({"role": "user", "content": prompt})
             with st.chat_message("user"): st.markdown(prompt)
