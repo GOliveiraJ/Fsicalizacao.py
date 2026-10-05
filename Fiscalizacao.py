@@ -719,122 +719,122 @@ def gerar_pdf(fisc):
                 pdf.ln(4)
     return bytes(pdf.output())
 
-# ==========================================
-# CÉREBRO DE IA NATIVO - 100 CENÁRIOS
-# ==========================================
-BASE_CONHECIMENTO_IA = [
-    # --- RDCs E LEGISLAÇÃO BÁSICA (1 a 25) ---
-    {"pergunta": "O que é a RDC 855/2024?", "tags": "rdc 855 2024 conceito o que é lei norma def", "resposta": "A **RDC nº 855/2024** é a resolução da ANVISA que proíbe expressamente a fabricação, importação, comercialização, distribuição, armazenamento, transporte e propaganda de todos os Dispositivos Eletrônicos para Fumar (DEF), incluindo vapes, pods e acessórios no Brasil."},
-    {"pergunta": "O que a RDC 840/2023 regulamenta?", "tags": "rdc 840 2023 propaganda anuncio publicidade", "resposta": "A **RDC nº 840/2023** regulamenta a propaganda comercial e a exposição de produtos fumígenos. Ela proíbe anúncios, cartazes, luminosos e vendas pela internet. A única publicidade permitida é a exposição das próprias embalagens nos locais de venda."},
-    {"pergunta": "Qual a função da RDC 896/2024?", "tags": "rdc 896 2024 registro cadastro regularizacao", "resposta": "A **RDC nº 896/2024** estabelece que todo produto fumígeno derivado ou não do tabaco (cigarros, charutos, narguilés) precisa ter **registro sanitário válido na ANVISA** para ser fabricado, importado ou comercializado no país."},
-    {"pergunta": "Do que trata a RDC 838/2023?", "tags": "rdc 838 2023 embalagem advertencia foto aviso rotulo", "resposta": "A **RDC nº 838/2023** determina o padrão das embalagens de produtos fumígenos. Ela obriga a presença de imagens e frases de advertência sanitária (como 'Este produto causa câncer') em 100% de uma das faces principais da embalagem."},
-    {"pergunta": "Qual a principal lei federal sobre o tabaco?", "tags": "lei federal 9294 1996 antifumo uso em local fechado", "resposta": "A principal é a **Lei nº 9.294/1996** (Lei Antifumo), que proíbe o uso de cigarros e assemelhados em recintos coletivos fechados e restringe rigorosamente a propaganda comercial desses produtos."},
-    {"pergunta": "Qual a lei que define as multas e penalidades sanitárias?", "tags": "lei 6437 1977 multa penalidade punicao autuar infracao", "resposta": "A **Lei nº 6.437/1977** configura as infrações à legislação sanitária federal. Ela estabelece as sanções, que vão desde advertência e apreensão de produtos até multas de R$ 2.000,00 a R$ 1.500.000,00 e interdição do local."},
-    {"pergunta": "O que é considerado um produto fumígeno para a Anvisa?", "tags": "conceito fumigeno derivado tabaco fumar", "resposta": "Para a Anvisa, **produto fumígeno** é qualquer produto manufaturado, derivado ou não do tabaco, que contenha folhas de plantas ou extratos, destinado a ser fumado, inalado, mascado ou chupado."},
-    {"pergunta": "Posso distribuir amostra grátis de cigarro?", "tags": "amostra gratis brinde doar dar distribuicao gratuita", "resposta": "Não. É terminantemente **proibida a distribuição de amostras grátis** ou brindes de produtos fumígenos, sejam eles cigarros tradicionais ou qualquer outro derivado, conforme a legislação federal (Lei 9.294/96 e RDC 840/2023)."},
-    {"pergunta": "É permitido vender cigarro pela internet ou aplicativo?", "tags": "venda internet site aplicativo online ifood whatsapp e-commerce", "resposta": "Não. A venda de produtos fumígenos por **internet, aplicativos, telefone, WhatsApp ou correio é estritamente proibida** pela legislação brasileira (RDC 840/2023). A venda só pode ocorrer de forma presencial."},
-    {"pergunta": "Qual a tolerância para produtos ilegais apreendidos?", "tags": "tolerancia limite quantidade apreender confiscar", "resposta": "A tolerância é **Zero**. Qualquer quantidade de produtos fumígenos sem registro na Anvisa, contrabandeados ou de DEFs (vapes) flagrada na fiscalização deve ser integralmente apreendida e inutilizada."},
-    {"pergunta": "A RDC 855 substituiu qual resolução antiga?", "tags": "substituiu rdc antiga 46", "resposta": "A RDC 855/2024 revogou e substituiu a **RDC nº 46/2009**, modernizando e reforçando as proibições sobre os Dispositivos Eletrônicos para Fumar no Brasil."},
-    {"pergunta": "Como verificar se a advertência da embalagem está na validade?", "tags": "validade advertencia prazo imagem", "resposta": "A Anvisa atualiza o banco de imagens periodicamente (RDC 838/2023). O fiscal deve checar no site oficial da ANVISA qual é o 'Grupo de Advertências' em vigor no ano da fiscalização."},
-    {"pergunta": "A RDC 840 permite cartazes de preços?", "tags": "cartaz preço tabela luminoso display", "resposta": "Apenas as **tabelas de preços oficiais padronizadas** impressas em fundo branco com letras pretas são permitidas. Cartazes promocionais, luminosos, cores vibrantes ou slogans associados à venda são proibidos (RDC 840/2023)."},
-    {"pergunta": "O que a ANVISA considera como exposição nos locais de venda?", "tags": "exposicao display prateleira mostruario", "resposta": "É o arranjo físico dos produtos no estabelecimento. A RDC 840/2023 determina que os expositores não podem usar recursos visuais ou sonoros de destaque, e no máximo 20% da face do expositor pode ser iluminada de forma neutra."},
-    {"pergunta": "Quem pode fiscalizar essas normas?", "tags": "quem fiscaliza competencia vigilancia sanitaria procon", "resposta": "A fiscalização é de competência do **Sistema Nacional de Vigilância Sanitária (SNVS)**, que inclui a ANVISA e as Vigilâncias Sanitárias Estaduais e Municipais. Órgãos como o PROCON e a Polícia Federal também podem atuar em conjunto."},
-    {"pergunta": "Cigarro paraguaio entra em qual infração?", "tags": "paraguai contrabando descaminho rdc 896", "resposta": "Cigarros estrangeiros clandestinos enquadram-se como **infrações à RDC 896/2024** (ausência de registro) e **RDC 838/2023** (ausência de advertência padrão em português), além de ser crime de contrabando federal."},
-    {"pergunta": "Existe algum cigarro eletrônico com registro na Anvisa?", "tags": "eletronico com registro vape legalizado aprovado", "resposta": "Não. **Nenhum cigarro eletrônico, vape ou pod possui registro na ANVISA**. A RDC 855/2024 proíbe todos, sem exceção, independentemente de terem ou não nicotina."},
-    {"pergunta": "Qual o prazo de defesa do autuado?", "tags": "prazo defesa recurso dias autuado", "resposta": "Conforme a Lei nº 6.437/1977, o infrator tem o prazo de **15 (quinze) dias** para apresentar defesa ou impugnação a partir da ciência do Auto de Infração."},
-    {"pergunta": "A Anvisa regula a venda de isqueiros ou sedas?", "tags": "isqueiro seda acessorios dichavador", "resposta": "A ANVISA foca nos produtos fumígenos. Acessórios genéricos (isqueiros, sedas) não são enquadrados como fumígenos. Porém, peças exclusivas para DEFs/Vapes (resistências, baterias) são proibidas pela RDC 855."},
-    {"pergunta": "O que acontece com o produto apreendido?", "tags": "inutilizacao destruicao destino apreendido lixo", "resposta": "Os produtos fumígenos irregulares apreendidos devem ser **inutilizados/destruídos** (geralmente incinerados), conforme Lei 6.437/1977, não podendo ser leiloados, doados ou devolvidos ao infrator sob nenhuma hipótese."},
-    {"pergunta": "É infração vender cigarro perto de escola?", "tags": "escola raio distancia proibido venda perto", "resposta": "Sim. Leis locais reforçam isso, mas no âmbito federal e no ECA (Estatuto da Criança), a proibição principal é a venda para menores, sendo agravada a comercialização ou propaganda no perímetro escolar."},
-    {"pergunta": "Fumo para mascar tem regulamentação?", "tags": "fumo mascar fumo oral snus tabaco", "resposta": "Sim. Fumos para mascar ou de uso oral são produtos fumígenos derivados do tabaco. Exigem **registro sanitário na ANVISA (RDC 896)** e adequação à regra de embalagens."},
-    {"pergunta": "Se um produto mudar o nome, precisa de novo registro?", "tags": "mudar nome alteracao embalagem", "resposta": "Sim. Qualquer alteração de marca comercial, composição, design ou embalagem requer aprovação ou notificação prévia e formal à ANVISA (RDC 896/2024)."},
-    {"pergunta": "A RDC 855 afeta acessórios de vape?", "tags": "acessorio bateria capinha resistencia algodao def", "resposta": "Sim. A RDC 855/2024 proíbe a venda de DEFs e **expressamente de seus acessórios, refis e peças de reposição** (resistências, baterias exclusivas, cartuchos líquidos)."},
-    {"pergunta": "Qual a diferença entre advertência frontal e lateral?", "tags": "frontal lateral aviso mensagem embalagem", "resposta": "Pela RDC 838/2023, a face posterior deve ter a imagem chocante cobrindo 100%. A face frontal traz advertência textual, e as faces laterais devem conter frases do Ministério da Saúde e o Disque-Saúde."},
+import ollama
 
-    # --- FISCALIZAÇÃO E SITUAÇÕES PRÁTICAS (26 a 50) ---
-    {"pergunta": "Encontrei um cigarro eletrônico escondido na gaveta do caixa. Como proceder?", "tags": "escondido gaveta caixa balcao mocozado", "resposta": "🚭 **Produto Escondido:** O armazenamento no caixa configura posse para comercialização. \n*Ação:* Apreenda o produto baseando-se na RDC 855/2024 (que proíbe o armazenamento) e lavre o Auto. Ocultar o produto demonstra dolo e agrava a infração."},
-    {"pergunta": "O dono da loja recusou entregar os pods e ameaçou a equipe. O que fazer?", "tags": "recusa impedir ameaça policia não quis dar obstar resistencia", "resposta": "🛑 **Obstrução:** A recusa é infração sanitária gravíssima (Lei 6.437/77) e crime de desobediência. \n*Ação:* Acione o apoio da Polícia Militar, apreenda compulsoriamente e registre Boletim de Ocorrência."},
-    {"pergunta": "Fiscalização encontrou apenas 1 (um) vape na loja. Apreende?", "tags": "um so unidade pouco quantidade pequena", "resposta": "✅ **Sim.** A proibição da RDC 855/2024 é absoluta. Um único dispositivo exposto ou armazenado já caracteriza infração sanitária sujeita a multa pecuniária e apreensão."},
-    {"pergunta": "O lojista diz que o vape é de uso pessoal dele. O que argumentar?", "tags": "uso pessoal consumo proprio dono argumenta", "resposta": "A RDC 855/2024 proíbe o **armazenamento e transporte** em todo o território nacional. Armazenar no balcão da loja descaracteriza 'uso pessoal'. O item deve ser apreendido no âmbito comercial da infração."},
-    {"pergunta": "Achei menor de idade comprando cigarro ou vape na loja.", "tags": "menor idade crianca adolescente comprando vendendo", "resposta": "🚨 **Crime:** Além da infração sanitária gravíssima, vender produto fumígeno ou DEF a menores de 18 anos é CRIME (Art. 243 do ECA). \n*Ação:* Acione a polícia imediatamente para prisão em flagrante do comerciante."},
-    {"pergunta": "A loja é um quiosque de shopping vendendo vape. Como proceder?", "tags": "quiosque shopping corredor", "resposta": "A RDC 855 aplica-se a qualquer ambiente. Em quiosques, a propaganda ostensiva também agrava (RDC 840). \n*Ação:* Apreensão imediata, autuação do lojista e notificação à administração do shopping por co-responsabilidade."},
-    {"pergunta": "O que é Apreensão Cautelar vs Apreensão Definitiva?", "tags": "cautelar definitiva diferenca tipo apreensao", "resposta": "**Cautelar:** Feita no momento da fiscalização para retirar o risco iminente de circulação (início do processo). **Definitiva:** Decretada no fim do processo administrativo, autorizando a destruição do bem apreendido."},
-    {"pergunta": "Vi propaganda de cigarro no Instagram da tabacaria. O que fazer?", "tags": "instagram rede social facebook internet prova print digital web", "resposta": "Publicidade na internet é proibida (RDC 840/2023). \n*Ação:* Capture prints, URLs e vídeos como prova. Abra processo administrativo contra o CNPJ da tabacaria por propaganda ilegal em meio digital."},
-    {"pergunta": "A loja não tem nota fiscal do cigarro normal. O que faço?", "tags": "nota fiscal sem nota origem procedencia", "resposta": "Cigarro sem comprovação de origem levanta suspeita de contrabando ou falsificação. \n*Ação:* Apreensão cautelar por risco sanitário e acionamento da Receita Federal e Polícia Federal para as sanções penais/tributárias."},
-    {"pergunta": "Posso quebrar ou jogar o vape no lixo na hora?", "tags": "quebrar destruir lixo na hora amassar quebra", "resposta": "❌ **Não.** A destruição de provas ou produtos deve seguir rito legal. O fiscal deve lavrar Termo de Apreensão, lacrar e levar para a custódia oficial da VISA para futura inutilização documentada."},
-    {"pergunta": "O dono da loja se recusa a assinar o Termo de Apreensão.", "tags": "nao assinar assina recusou testemunha", "resposta": "A recusa não invalida o ato. Anote no Termo: *'O autuado recusou-se a assinar'*, e colha a assinatura de duas testemunhas presentes (policiais, fiscais parceiros ou clientes)."},
-    {"pergunta": "Como autuar comércio ambulante vendendo vape na rua?", "tags": "ambulante camelô rua barraca sinal", "resposta": "A legislação federal (RDC 855) proíbe a venda em todo o território. Com o apoio da PM ou Guarda Municipal, identifique o indivíduo, apreenda os produtos e emita o auto de infração no CPF (se não tiver CNPJ)."},
-    {"pergunta": "Venda de narguilé em bares para consumo no local. Qual a regra?", "tags": "narguile bar consumo fumar ambiente fechado restaurante", "resposta": "A Lei 9.294/96 **proíbe** o consumo em ambientes fechados ou parcialmente fechados. Bares só podem permitir o consumo se tiverem áreas ao ar livre totalmente isoladas e legalizadas especificamente para isso."},
-    {"pergunta": "O produto tem a foto da advertência, mas está em inglês.", "tags": "ingles espanhol lingua estrangeira advertencia", "resposta": "❌ **Ilegal.** A RDC 838/2023 exige advertências no idioma Português com o padrão do Ministério da Saúde. Advertência estrangeira indica descaminho/contrabando. Proceder com apreensão."},
-    {"pergunta": "Fiscalização noturna em boate vendendo cigarro solto. Regras?", "tags": "noite noturna boate balada festa solto unidade varejo", "resposta": "A VISA tem poder de polícia 24h. Venda fracionada (solto) é crime contra o consumidor e infração sanitária. \n*Ação:* Apreensão do produto aberto, autuação da boate e ordem para cessar a venda ilegal na hora."},
-    {"pergunta": "Posso fechar a loja só por ter um cigarro eletrônico?", "tags": "fechar interditar loja", "resposta": "Interdição é penalidade extrema. Geralmente aplica-se a reincidentes ou estabelecimentos de alto risco/clandestinos. Na 1ª fiscalização de DEFs, a praxe é a apreensão e multa (Lei 6437)."},
-    {"pergunta": "Posso apreender cigarro eletrônico na boca do cliente?", "tags": "cliente usando pessoa fumando boca mao", "resposta": "O foco é o **estabelecimento**. Se o cliente estiver usando DEF, o fiscal autua a LOJA por permitir o uso em recinto fechado (Lei 9.294), mas não arranca o objeto de uso pessoal do cliente. Pode orientar o cliente sobre a lei."},
-    {"pergunta": "A loja vende camisetas com a marca Marlboro. Pode?", "tags": "camiseta bone brinde marca na roupa vestuario", "resposta": "❌ **Não.** É proibida a comercialização de produtos não fumígenos (roupas, bonés) que ostentem marcas de produtos fumígenos (RDC 840/2023), pois configura publicidade cruzada."},
-    {"pergunta": "Expositor de cigarro fica perto dos chocolates. Pode?", "tags": "chocolate bala doce caixa perto", "resposta": "❌ **Não.** A RDC 840 proíbe expor cigarros a uma distância inferior a 1 metro de produtos infantis (balas, doces, brinquedos) para evitar atratividade aos menores."},
-    {"pergunta": "Loja de conveniência com luminoso de neon da marca.", "tags": "neon luminoso painel luz conveniencia", "resposta": "Infração clara à RDC 840. O painel deve ser desligado imediatamente, o material apreendido (ou autuado para remoção) e a loja multada por propaganda e publicidade ostensiva."},
-    {"pergunta": "O que é 'Termo de Fiel Depositário'?", "tags": "fiel depositario deixar na loja volume grande deposito", "resposta": "Em apreensões gigantescas sem transporte imediato, o material é lacrado no estoque do infrator. Ele assina como Fiel Depositário, assumindo a responsabilidade civil/criminal de não mover ou vender a carga até o recolhimento oficial."},
-    {"pergunta": "Fiscalização de aeroporto. Posso apreender DEFs da mala do passageiro?", "tags": "aeroporto mala trazer de fora viagem alfandega", "resposta": "A importação é proibida. No desembarque internacional, a competência originária é da Receita Federal. Fiscais da Anvisa em portos/aeroportos devem atuar em conjunto com a Receita para o perdimento aduaneiro e retenção sanitária."},
-    {"pergunta": "Lojista diz que o fornecedor jurou que o pod era legal.", "tags": "culpa fornecedor distribuidor vendedor inocente", "resposta": "A responsabilidade é solidária e objetiva na vigilância sanitária. Quem expõe à venda comete a infração. \n*Ação:* Autuar a loja. O dono poderá buscar ressarcimento contra o fornecedor na justiça cível, mas a Anvisa pune o comércio flagrado."},
-    {"pergunta": "Lojista tentou oferecer dinheiro para não apreender.", "tags": "suborno dinheiro propina corrupcao crime", "resposta": "Corrupção Ativa (Art. 333, CP). \n*Ação:* Recusar veementemente, dar voz de prisão em flagrante e acionar as polícias Militar ou Federal. O relato da tentativa de suborno deve constar no relatório da autuação sanitária."},
-    {"pergunta": "Como autuar se a marca ilegal estiver em chinês?", "tags": "marca desconhecida chines idioma asitico nome", "resposta": "No Auto de Infração, descreva a embalagem: 'Produto fumígeno de marca ilegível / Caracteres asiáticos / Sem identificação em português', especificando quantidade, cor e categoria (DEF ou Tabaco sem registro)."},
+def motor_juridico_anvisa_nlp(prompt_usuario):
+    pergunta = prompt_usuario.lower()
+    
+    # Limpa a pontuação para ler o CNPJ corretamente
+    prompt_limpo = pergunta.replace(".", "").replace("/", "").replace("-", "")
+    numeros_pergunta = re.sub(r'\D', '', prompt_limpo)
+    palavras_pergunta = [p for p in re.findall(r'\b\w+\b', pergunta) if len(p) > 3]
+    
+    palavras_ignoradas = {'para', 'com', 'sabor', 'menta', 'azul', 'blue', 'red', 'gold', 'silver', 'black', 'white', 'classic', 'original', 'ice', 'mix', 'fresh', 'blend', 'tradicional', 'slim', 'slims', 'premium', 'edition', 'double', 'menthol', 'cherry', 'grape', 'mint', 'qual', 'como', 'onde', 'tem', 'esse', 'este', 'esta', 'aqui', 'pode', 'vender', 'legal', 'ilegal', 'cnpj', 'empresa', 'marca', 'produto', 'registro', 'registrado'}
 
-    # --- TABACOS E DERIVADOS TRADICIONAIS (51 a 75) ---
-    {"pergunta": "Charutos precisam ser registrados na Anvisa?", "tags": "charuto havana cubano registro puro", "resposta": "✅ **Sim.** Todo charuto, nacional ou importado (ex: Cohiba, Romeu e Julieta), necessita de **registro sanitário ativo** na Anvisa (RDC 896/2024) para ser comercializado de forma lícita."},
-    {"pergunta": "Quais as regras para cigarro de palha (palheiros)?", "tags": "palha palheiro paulistinha piracanjuba souza paiol", "resposta": "Cigarros de palha são fumígenos regulados. Exigem **registro na Anvisa** e advertência com foto na embalagem. Palheiros 'de roça' vendidos em saquinhos transparentes lisos são ilegais e passíveis de apreensão."},
-    {"pergunta": "Fumo para cachimbo é proibido?", "tags": "cachimbo fumo lata", "resposta": "É permitido, desde que siga as mesmas regras: Registro ativo (RDC 896) e embalagem/lata com as frases e imagens de advertência de perigo do Ministério da Saúde."},
-    {"pergunta": "Essências de Narguilé (Zomo, Nay, Adalya) são legais?", "tags": "narguile zomo nay adalya essencia melaço", "resposta": "✅ **Permitidas se registradas.** O melaço de narguilé é derivado do tabaco. Cada marca/sabor exige registro na Anvisa e caixa com advertência. Se a marca não constar no sistema Anvisa, apreende-se por falta de registro."},
-    {"pergunta": "Diferença legal entre Narguilé e Vape?", "tags": "diferenca narguile vape pod eletronico lei", "resposta": "Narguilé tradicional (queima carvão) é permitido se o fumo tiver registro. Vape/Pod (dispositivo eletrônico à bateria) é **integralmente proibido pela RDC 855**, independentemente de queimar ou vaporizar nicotina."},
-    {"pergunta": "Pode vender fumo de rolo ou corda a granel?", "tags": "rolo corda fumo solto granel feira", "resposta": "❌ **Irregular.** A venda de fumo a granel (cortando pedaços no balcão) impede a exposição das advertências sanitárias obrigatórias (RDC 838). O fumo deve ser vendido fracionado de fábrica em embalagem padronizada."},
-    {"pergunta": "O que é snus ou tabaco oral? Pode vender?", "tags": "snus mascar oral labio", "resposta": "Snus e fumos de mascar são permitidos desde que tenham registro. Contudo, o Brasil tem fortes restrições a **aditivos de sabor** neles. A esmagadora maioria dos snus importados hoje entra por contrabando e é ilegal."},
-    {"pergunta": "Pode vender cigarros com sabor (menta, cereja)?", "tags": "sabor menta cereja aditivo claudia gudang", "resposta": "Atualmente, devido a liminares do STF sobre a antiga RDC 14/2012, cigarros com sabor (Gudang, Lucky Strike Menta) que possuam **registro ativo na base da Anvisa** podem ser comercializados legalmente."},
-    {"pergunta": "Tabacaria pode fazer degustação de charutos no local?", "tags": "degustacao fumar provar tabacaria lounge", "resposta": "Apenas se tiver área exclusiva (Lounge) em conformidade com as regras rígidas de exaustão e isolamento da Lei Antifumo. Do contrário, é infração. É proibida a 'distribuição de amostra grátis'."},
-    {"pergunta": "Pode expor charutos em caixas de vidro sem advertência?", "tags": "umidificador vidro caixa aberta exposto sem aviso", "resposta": "❌ **Não.** A unidade vendida ou a caixa expositora precisa ostentar as advertências sanitárias oficiais do Brasil. Caixas de charuto estrangeiro 'limpas' indicam importação ilegal."},
-    {"pergunta": "Blunts (folhas para enrolar) são legais?", "tags": "blunt folha charuto enrolar hemp", "resposta": "Se a Blunt for feita de folhas de tabaco homogeneizado, é produto fumígeno e exige registro Anvisa e foto de advertência. Se for feita de celulose sem tabaco, não é regulada pela GGTAB."},
-    {"pergunta": "Fumo para enrolar (Rolling Tobacco) é permitido?", "tags": "enrolar desfiado pacote rolling sasso hi tobacco", "resposta": "Sim. Fumos desfiados como Hi Tobacco e Sasso são legais. Condição obrigatória: possuir registro ativo na ANVISA e embalagem com face frontal/posterior com avisos de risco de câncer."},
-    {"pergunta": "Produto de tabaco artesanal feito em casa pode ser vendido?", "tags": "artesanal caseiro sem marca roça", "resposta": "❌ **Ilegal.** Não existe 'venda artesanal informal' permitida. Todo fumígeno requer CNPJ fabricante e liberação sanitária (risco de toxinas não testadas). Apreensão imediata por risco à saúde pública."},
-    {"pergunta": "O que é cigarro Kretek e é legal?", "tags": "kretek cravo indonesio", "resposta": "Kretek são cigarros de tabaco misturados com cravo (ex: Djarum, Sampoerna). São legais no Brasil **apenas** as marcas e variações que possuem o Registro Sanitário ativo e embalagens traduzidas."},
-    {"pergunta": "Cigarro paraguaio vs Nacional. Qual a regra de apreensão?", "tags": "paraguai nacional falsificado", "resposta": "Cigarros paraguaios entram por contrabando, são sonegadores e altamente tóxicos por falta de regulação. \n*Ação:* Apreender com base na RDC 896 (sem registro sanitário brasileiro)."},
-    {"pergunta": "Vender cigarro solto a varejo por 1 real.", "tags": "um real unidade avulso solto", "resposta": "❌ **Proibido.** A venda fracionada é crime tributário e sanitário, pois impede a leitura das advertências do maço. O fiscal deve apreender os maços abertos e autuar o estabelecimento."},
-    {"pergunta": "Seda, dichavador e filtro têm regulação da GGTAB?", "tags": "seda filtro dichavador acessorio papel", "resposta": "Não diretamente. Papéis (sedas) e piteiras que não contêm tabaco e não são eletrônicos não precisam de registro e não levam fotos de câncer. São apenas acessórios auxiliares."},
-    {"pergunta": "Displays de cigarro com pisca-pisca e neon.", "tags": "padaria display piscar luz neon iluminado", "resposta": "❌ **Ilegal.** A RDC 840 define que o mostruário deve ser estático. Qualquer iluminação deve ser indireta e neutra. Displays vibrantes configuram infração de publicidade."},
-    {"pergunta": "Exigir RG para venda de tabaco é obrigatório?", "tags": "identidade rg menor de idade jovem", "resposta": "Sim. É dever inalienável do comerciante exigir documento de identificação com foto de quem apresentar aparência menor de 18 anos, evitando o crime de venda a menores."},
-    {"pergunta": "Afixar cartaz de proibição para menores é lei?", "tags": "cartaz aviso lei menor visivel", "resposta": "✅ **Sim.** A legislação federal (ECA e Lei Antifumo) e resoluções da Anvisa obrigam a afixação de avisos legíveis: 'Proibida a Venda a Menores de 18 Anos'."},
-    {"pergunta": "IQOS e Heets é cigarro normal ou eletrônico?", "tags": "tabaco aquecido iqos heets hnb", "resposta": "São classificados como **Tabaco Aquecido (Heat-not-Burn)**, que é uma subcategoria dos DEFs. Portanto, a venda de aparelhos IQOS e refis Heets/Terea está totalmente proibida pela RDC 855/2024."},
-    {"pergunta": "Venda de cigarros estrangeiros legalizados (Duty Free).", "tags": "estrangeiro importado duty free alfandega", "resposta": "A venda fora das zonas francas só é permitida se a marca possuir registro no Brasil e maço nacionalizado (com advertência em português). Vender pacote Duty Free em loja de rua é crime."},
-    {"pergunta": "O que fazer se a marca não constar no Banco de Dados?", "tags": "marca nao ta no banco desconhecida", "resposta": "O Banco de Produtos é a Bíblia do Fiscal. Se uma marca de tabaco tradicional não estiver na lista de produtos registrados, ela é classificada automaticamente como ILEGAL e deve ser apreendida."},
-    {"pergunta": "Cigarro San Marino e Eight é sempre ilegal?", "tags": "san marino eight contrabando falsificacao", "resposta": "A esmagadora maioria no mercado popular é contrabando paraguaio sem registro. Para ser legal, tem que ter o selo do IPI do Brasil e as fotos de advertência chocante em português no verso."},
-    {"pergunta": "Farmácias podem vender cigarro?", "tags": "farmacia drogaria remedio vender", "resposta": "❌ **Absolutamente Proibido.** A RDC nº 44/2009 proíbe qualquer farmácia ou drogaria de comercializar produtos alheios à saúde, sendo expressamente banida a venda de cigarros nestes locais sob pena de cassação do alvará."},
+    # --- FASE 1: BUSCA ATIVA NO BANCO GGTAB (PYTHON) ---
+    cnpjs_alvo = set()
+    empresas_alvo_ilegais = set()
+    
+    for cat, tipos in DB_PRODUTOS.items():
+        for tipo, produtos in tipos.items():
+            for prod_full, cnpj in produtos.items():
+                cnpj_num = re.sub(r'\D', '', cnpj)
+                match_parenteses = re.match(r'^(.*?)\s*\((.*?)\)$', prod_full)
+                marca = match_parenteses.group(1).strip().lower() if match_parenteses else prod_full.lower()
+                empresa = match_parenteses.group(2).strip().lower() if match_parenteses else ""
+                empresa_limpa = empresa.replace(" ltda", "").replace(" eireli", "").replace(" s.a.", "").replace(" - me", "").replace(".", "").strip()
 
-    # --- DISPOSITIVOS ELETRÔNICOS PARA FUMAR (DEFs) (76 a 100) ---
-    {"pergunta": "O que exatamente é um DEF na RDC 855?", "tags": "def definicao sigla oq e", "resposta": "DEF (Dispositivo Eletrônico para Fumar) é qualquer aparelho alimentado por bateria que aquece um líquido ou tabaco sólido para criar aerossol inalável. Inclui Vapes, Pods descartáveis e Tabacos Aquecidos."},
-    {"pergunta": "O que é um Pod Descartável?", "tags": "pod descartavel ignite elfbar waka puff", "resposta": "É o DEF mais comum hoje. Vem carregado com bateria e líquido (geralmente Nic Salt de 5%), pronto para uso e lixo depois (Ex: Ignite, Elfbar). **Totalmente proibido pela RDC 855.**"},
-    {"pergunta": "Diferença entre Vape (Mod) e Pod.", "tags": "diferenca vape pod mod aparelho", "resposta": "O Vape/Mod é grande, recarregável e gera nuvens gigantes de vapor usando 'Juices' líquidos separados. O Pod é portátil, de sistema fechado e entrega alta dose de nicotina rápida. Ambos são DEFs ILEGAIS."},
-    {"pergunta": "O líquido (Juice) do vape é 'só vapor de água'?", "tags": "juice essencia sem nicotina zero agua", "resposta": "Mito. O líquido é uma mistura tóxica de Propilenoglicol, Glicerina Vegetal, aromatizantes artificiais e substâncias químicas que, ao serem aquecidas, geram formol e aldeídos cancerígenos."},
-    {"pergunta": "Se o Juice do vape tiver 0% nicotina, pode vender?", "tags": "zero nicotina sem nicotina livre", "resposta": "❌ **Ilegal.** A RDC 855 proíbe qualquer DEF ou líquido para DEF, independentemente de conter ou não nicotina. A inalação recreativa de aerossóis eletrônicos não é permitida sob nenhuma forma."},
-    {"pergunta": "O que é EVALI associada ao vape?", "tags": "evali doenca pulmao internacao morte uti", "resposta": "EVALI é a Lesão Pulmonar Associada ao Uso de Cigarros Eletrônicos. Uma doença severa que inflama e destrói os pulmões rapidamente (frequentemente ligada à inalação de acetato de vitamina E e metais)."},
-    {"pergunta": "Vape de Vitaminas ou Melatonina para dormir. É legal?", "tags": "vitamina melatonina saudavel dormir nutri", "resposta": "❌ **Ilegal e Perigoso.** Não há vaporização eletrônica segura. A venda de 'vapes vitamínicos' mascara o risco da inalação de óleos aquecidos que causam pneumonia grave. Totalmente proibidos pela RDC 855."},
-    {"pergunta": "O que é Nic Salt presente nos Pods?", "tags": "nic salt nicsalt sal de nicotina", "resposta": "Nicotina sintética modificada com ácido (Sal de Nicotina) para não arder a garganta. Isso permite que dispositivos pequenos entreguem um 'soco' de nicotina no cérebro equivalente a 1 maço de cigarro em poucos tragos, gerando vício imediato."},
-    {"pergunta": "Qual o risco das baterias de vapes importados?", "tags": "bateria explosao fogo bolso rosto incendio", "resposta": "Por serem frutos de contrabando, os DEFs usam baterias de lítio de baixa qualidade sem certificação INMETRO, apresentando falhas crônicas de segurança (explosões espontâneas e incêndios)."},
-    {"pergunta": "Vape passivo afeta outras pessoas?", "tags": "passivo vape fumaça fuma os outros aerossol", "resposta": "Sim. O aerossol não evapora limpo. Ele deposita partículas ultrafinas, nicotina e formol no ambiente. O uso é proibido em locais fechados coletivos pela Lei 9.294/96."},
-    {"pergunta": "Quais os danos a longo prazo do Vape confirmados?", "tags": "dano longo prazo coracao cancer infarto asma dpoc", "resposta": "Aumenta drasticamente o risco de arritmias, infarto agudo, crise de asma, doença pulmonar obstrutiva e potenciais tumores derivados da inalação constante de metais pesados da resistência aquecida."},
-    {"pergunta": "Vape ajuda a parar de fumar cigarro?", "tags": "ajuda parar tratamento largar vicio", "resposta": "A OMS e a Anvisa **rejeitam** essa tese. Não há provas de eficácia médica. Ocorre o inverso: jovens que nunca fumaram viciam-se nos Pods, e adultos viram 'fumantes duplos' (Dual Use)."},
-    {"pergunta": "Lojista alega redução de danos do cigarro eletrônico.", "tags": "reducao danos inglaterra seguro defesa", "resposta": "Não há política oficial de Redução de Danos com DEFs no Brasil. A Anvisa proibiu os dispositivos justamente porque não há dossiês toxicológicos aprovados e os riscos superam quaisquer benefícios hipotéticos."},
-    {"pergunta": "IQOS (Heets) diz que não queima o tabaco. É isento?", "tags": "iqos aquecido philip morris heets terea", "resposta": "❌ **Não.** É um DEF da subcategoria 'Tabaco Aquecido'. Apesar de não usar combustão, ele gera aerossol químico. A sua comercialização é proibida no Brasil, mesmo discurso das empresas sendo outro."},
-    {"pergunta": "Importei um Vape dos EUA para uso próprio. É crime?", "tags": "importado eua correio amazon legalizado alfandega", "resposta": "A RDC 855 é expressa: A importação de DEF, **inclusive para uso próprio (bagagem ou correios)**, é proibida. O produto está sujeito a retenção e perdimento imediato pela Receita Federal."},
-    {"pergunta": "Sabor de algodão doce e menta (Mint/Cotton Candy). Por quê?", "tags": "sabor doce cotton candy mint watermelon ice jovem atrativo", "resposta": "A indústria de DEFs usa flavorizantes para mascarar o amargor do 'Nic Salt' e atrair especificamente o público adolescente e infantil. É uma das razões principais da proibição mundial crescente dos vapes."},
-    {"pergunta": "Um Pod de 10.000 puffs tem quanta nicotina?", "tags": "equivale maco quantos normal equivalencia puff 5000 10000", "resposta": "Um Pod descartável de alta capacidade contém nicotina equivalente a dezenas de maços de cigarros tradicionais num único cilindro, elevando ao extremo o risco de intoxicação aguda por sobredose de nicotina."},
-    {"pergunta": "Bobinas (Coils) e Algodão para vape na loja. O que faço?", "tags": "coil bobina algodao resistencia peca acessorio", "resposta": "✅ **Apreenda.** A RDC 855/2024 bane não só o aparelho principal, mas também **'acessórios, peças e refis'**. Produtos destinados claramente e exclusivamente a vapes são irregulares."},
-    {"pergunta": "Vender essência Zomo Vape é infração?", "tags": "zomo vape nasty juice liquido essencia e-liquid", "resposta": "❌ **Ilegal.** Não confundir o fumo de narguilé (legal) com as essências líquidas 'Vape Juice' da mesma marca. Qualquer líquido para DEF, de qualquer marca, carece de registro e é proibido."},
-    {"pergunta": "Máquinas de autoatendimento vendendo pod no shopping.", "tags": "vending machine maquina automatica totem", "resposta": "Acumula 3 infrações graves: Venda de DEF (RDC 855), venda automática de fumígenos que burla fiscalização de idade, e propaganda ostensiva. O totem deve ser apreendido/interditado na hora."},
-    {"pergunta": "Caneta Vape de Canabidiol (CBD/THC). Como a VISA atua?", "tags": "cbd thc canabidiol maconha caneta pen entorpecente", "resposta": "É uma infração sanitária (DEF proibido) somada a um possível ilícito penal (Lei de Drogas). A VISA apreende pelo risco sanitário (RDC 855) e aciona imediatamente a Polícia por indício de substância entorpecente."},
-    {"pergunta": "Propaganda de Vape escrito 'Mais seguro que cigarro'.", "tags": "seguro menos danoso mentira fake propaganda enganosa", "resposta": "Publicidade totalmente ilícita (RDC 840) e crime de relação de consumo. Alegações de saúde e mitigação de risco não aprovadas pela Anvisa constituem agravantes na formulação da multa do Auto de Infração."},
-    {"pergunta": "O dono da loja começou a chorar para não apreender os vapes.", "tags": "chorar pena devolver peninha jogar fora amassar", "resposta": "O fiscal age pela legalidade estrita. Devolver material ilegal (sob pena ou suborno) constitui prevaricação. O material flagrado deve ser recolhido de imediato, independentemente das promessas do autuado de não vender mais."},
-    {"pergunta": "Como descrever um vape no Auto de Infração?", "tags": "escrever preencher como coloca no papel termo", "resposta": "Exemplo padrão: *'Exposição à venda e armazenamento de X unidades de Dispositivos Eletrônicos para Fumar (DEF), marca IGNITE/ELFBAR, em desacordo com a RDC nº 855/2024 e Lei nº 6.437/1977.'*"},
-    {"pergunta": "O que significa 'Dual Use' no contexto de DEFs?", "tags": "dual use duplo uso cigarro e vape mistura fumante", "resposta": "É o Uso Duplo. Dados mostram que usuários de DEFs acabam fumando cigarros tradicionais simultaneamente, combinando o alcatrão e monóxido de carbono com os metais e alta nicotina do pod, maximizando os danos à saúde."}
-]
+                is_match = False
+                
+                if len(numeros_pergunta) >= 8 and cnpj_num and (numeros_pergunta in cnpj_num or cnpj_num in numeros_pergunta):
+                    is_match = True
+                else:
+                    for p in palavras_pergunta:
+                        if p not in palavras_ignoradas:
+                            if p in marca.split() or (empresa_limpa and p in empresa_limpa.split()):
+                                is_match = True
+                                break
+                                
+                if is_match:
+                    if "Ilegal" not in cnpj:
+                        cnpjs_alvo.add(cnpj)
+                    else:
+                        empresas_alvo_ilegais.add(marca)
 
-# ==========================================
-# CÉREBRO DE IA NATIVO - CACHE ESTRUTURADO
-# ==========================================
+    empresas_encontradas = {}
+    for cat, tipos in DB_PRODUTOS.items():
+        for tipo, produtos in tipos.items():
+            for prod_full, cnpj in produtos.items():
+                match_parenteses = re.match(r'^(.*?)\s*\((.*?)\)$', prod_full)
+                marca_exibicao = match_parenteses.group(1).strip() if match_parenteses else prod_full
+                empresa_exibicao = match_parenteses.group(2).strip() if match_parenteses else "Marca Independente"
+                
+                if cnpj in cnpjs_alvo or marca_exibicao.lower() in empresas_alvo_ilegais:
+                    chave = cnpj if "Ilegal" not in cnpj else marca_exibicao
+                    if chave not in empresas_encontradas:
+                        status_str = "REGISTRADO (Permitido)" if "Ilegal" not in cnpj else "ILEGAL (Clandestino)"
+                        empresas_encontradas[chave] = {
+                            "empresa": empresa_exibicao if "Ilegal" not in cnpj else "Fabricante Clandestino",
+                            "cnpj": cnpj,
+                            "status": status_str,
+                            "produtos": []
+                        }
+                    empresas_encontradas[chave]["produtos"].append(f"{marca_exibicao} ({tipo})")
+
+    contexto_banco_para_ia = ""
+    texto_banco_para_tela = ""
+    
+    if empresas_encontradas:
+        texto_banco_para_tela = "### 🏢 Dossiê Corporativo (Banco GGTAB)\n\n"
+        for chave, dados in empresas_encontradas.items():
+            texto_banco_para_tela += f"**Origem/Fabricante:** {dados['empresa']}\n**CNPJ:** {dados['cnpj']}\n**Status Global:** {dados['status']}\n**Portfólio:**\n" 
+            texto_banco_para_tela += "\n".join([f"- {p}" for p in dados['produtos'][:10]]) + ("\n- *(...e outros)*\n\n" if len(dados['produtos'])>10 else "\n\n")
+            
+            # Passa essa informação crua para a IA ler
+            contexto_banco_para_ia += f"Empresa: {dados['empresa']}, CNPJ: {dados['cnpj']}, Status: {dados['status']}.\n"
+        texto_banco_para_tela += "---\n"
+        
+    elif len(numeros_pergunta) >= 11 or any(termo in pergunta for termo in ["cnpj", "empresa", "fabricante"]):
+        texto_banco_para_tela = "### 🔍 Consulta Ativa no Banco\n🚨 **ALERTA VERMELHO:** O CNPJ/Empresa NÃO CONSTA no banco da ANVISA.\n*Diretriz:* Produto CLANDESTINO/ILEGAL. Passível de apreensão.\n\n---\n"
+        contexto_banco_para_ia = "O fiscal consultou um CNPJ/Produto que NÃO EXISTE no banco de dados. Informe que o produto é ilegal por falta de registro (RDC 896)."
+
+    # --- FASE 2: CONEXÃO COM O OLLAMA LOCAL (Llama 3.2) ---
+    
+    # Prompt do Sistema (O "Cérebro" da IA)
+    system_prompt = f"""
+Você é o Assistente Jurídico Especialista da GGTAB (ANVISA).
+Responda de forma curta, direta e profissional. Use formatação em Markdown (negrito para as leis).
+
+Suas leis base:
+1. RDC 855/2024: Proíbe totalmente Dispositivos Eletrônicos para Fumar (DEF/Vapes/Pods/Juices).
+2. RDC 840/2023: Proíbe qualquer propaganda de cigarros (cartazes, luminosos, internet).
+3. RDC 896/2024: Exige registro na ANVISA para comercializar tabaco. Contrabando/Paraguai não tem registro.
+4. RDC 838/2023: Exige advertências sanitárias em português nas embalagens.
+5. Lei 6.437/1977: Define as multas (R$2.000 a R$1.500.000) e apreensões.
+6. Lei 9.294/1996 (Lei Antifumo): Proíbe uso em local fechado e reitera proibição de propaganda.
+
+Informação do Banco de Dados recuperada para esta pergunta:
+[{contexto_banco_para_ia if contexto_banco_para_ia else "Nenhuma consulta específica ao banco identificada."}]
+
+Sua missão: Responda à dúvida do fiscal com base nessas leis e na informação do banco.
+"""
+
+    try:
+        # Aqui a mágica acontece offline no seu PC!
+        resposta_ollama = ollama.chat(
+            model='llama3.2', # Certifique-se de ter baixado este modelo
+            messages=[
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': prompt_usuario}
+            ],
+            options={'temperature': 0.1} # Temperatura baixa para ele ser exato e não inventar
+        )
+        resposta_final_ia = "### ⚖️ Parecer do Motor Jurídico (Ollama):\n\n" + resposta_ollama['message']['content']
+        
+    except Exception as e:
+        resposta_final_ia = f"⚠️ Erro ao conectar com o Ollama Local: {e}. Verifique se o aplicativo Ollama está aberto no seu PC."
+
+    return texto_banco_para_tela + resposta_final_ia==========================================
 @st.cache_resource
 def carregar_motor_ia():
     if not HAS_NLP:
