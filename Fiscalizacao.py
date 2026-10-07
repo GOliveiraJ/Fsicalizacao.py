@@ -728,8 +728,7 @@ def motor_juridico_anvisa_nlp(prompt_usuario):
     numeros_pergunta = re.sub(r'\D', '', prompt_limpo)
     palavras_pergunta = [p for p in re.findall(r'\b\w+\b', pergunta) if len(p) > 3]
     
-    palavras_ignoradas = {'para', 'com', 'sabor', 'menta', 'azul', 'blue', 'red', 'gold', 'silver', 'black', 'white', 'classic', 'original', 'ice', 'mix', 'fresh', 'blend', 'tradicional', 'slim', 'slims', 'premium', 'edition', 'double', 'menthol', 'cherry', 'grape', 'mint', 'qual', 'como', 'onde', 'tem', 'esse', 'este', 'esta', 'aqui', 'pode', 'vender', 'legal', 'ilegal', 'cnpj', 'empresa', 'marca', 'produto', 'registro', 'registrado'}
-
+    palavras_ignoradas = {'para', 'com', 'sabor', 'menta', 'azul', 'blue', 'red', 'gold', 'silver', 'black', 'white', 'classic', 'original', 'ice', 'mix', 'fresh', 'blend', 'tradicional', 'slim', 'slims', 'premium', 'edition', 'double', 'menthol', 'cherry', 'grape', 'mint', 'qual', 'quais', 'como', 'onde', 'tem', 'esse', 'este', 'esta', 'aqui', 'pode', 'vender', 'legal', 'ilegal', 'cnpj', 'cnpjs', 'empresa', 'empresas', 'marca', 'marcas', 'produto', 'produtos', 'registro', 'registrado', 'sobre', 'tudo'}
     # --- FASE 1: BUSCA ATIVA NO BANCO GGTAB (PYTHON) ---
     cnpjs_alvo = set()
     empresas_alvo_ilegais = set()
