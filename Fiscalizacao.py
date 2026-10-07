@@ -37,7 +37,7 @@ try:
 except ImportError:
     HAS_OCR = False
 
-# Importação EXCLUSIVA do Ollama (IA Local Real)
+# Importação EXCLUSIVA da IA Local (Ollama)
 try:
     import ollama
     HAS_OLLAMA = True
@@ -361,7 +361,7 @@ DB_PRODUTOS_BASE = {
             "GF (VITORIA IMPORTAÇÃO, EXPORTAÇÃO, INDUSTRIA & COMERCIO DE TABACOS LTDA)": "18.559.637/0001-88",
             "WORLD STOP (VITORIA IMPORTAÇÃO, EXPORTAÇÃO, INDUSTRIA & COMERCIO DE TABACOS LTDA)": "18.559.637/0001-88"
         },
-        "🕴️️ Charutos": {
+        "🕴️ Charutos": {
             "LOS 3 CATEDRATICOS DELÍCIAS ROBUSTO (ALCEMIRO FERREIRA DE BARROS - ME)": "12.791.254/0001-54",
             "PERCEVERANCIA NICARAGUA - TORO (APM COMERCIO, IMPORTAÇÃO E EXPORTAÇÃO DE FUMO LTDA)": "05.968.360/0001-03",
             "ARTURO FUENTE CHATEAU FUENTE (BMCS COMERCIO IMPORTAÇÃO E EXPORTAÇÃO EIRELI – ME)": "24.259.866/0001-80",
@@ -607,6 +607,8 @@ def salvar_produto_nuvem(categoria, tipo, produto, cnpj, status):
                 registrar_log("Novo Produto Cadastrado", f"A marca '{produto}' foi salva para futuras fiscalizações.")
         except Exception: pass
 
+DB_PRODUTOS = obter_banco_atualizado()
+
 def get_cnpj_mapping():
     mapping = {}
     for cat, tipos in DB_PRODUTOS.items():
@@ -615,6 +617,7 @@ def get_cnpj_mapping():
                 cnpj_limpo = re.sub(r'\D', '', cnpj) 
                 if len(cnpj_limpo) > 10: mapping[cnpj_limpo] = prod
     return mapping
+CNPJ_TO_PRODUTO = get_cnpj_mapping()
 
 def clean_text_for_pdf(text):
     if not text: return text
@@ -716,7 +719,7 @@ def gerar_pdf(fisc):
     return bytes(pdf.output())
 
 # ==========================================
-# CÉREBRO DE IA NATIVO - INTEGRAÇÃO OLLAMA
+# CÉREBRO DE IA (OLLAMA)
 # ==========================================
 def motor_juridico_anvisa_nlp(prompt_usuario):
     if not HAS_OLLAMA:
@@ -728,7 +731,8 @@ def motor_juridico_anvisa_nlp(prompt_usuario):
     numeros_pergunta = re.sub(r'\D', '', prompt_limpo)
     palavras_pergunta = [p for p in re.findall(r'\b\w+\b', pergunta) if len(p) > 3]
     
-    palavras_ignoradas = {'para', 'com', 'sabor', 'menta', 'azul', 'blue', 'red', 'gold', 'silver', 'black', 'white', 'classic', 'original', 'ice', 'mix', 'fresh', 'blend', 'tradicional', 'slim', 'slims', 'premium', 'edition', 'double', 'menthol', 'cherry', 'grape', 'mint', 'qual', 'quais', 'como', 'onde', 'tem', 'esse', 'este', 'esta', 'aqui', 'pode', 'vender', 'legal', 'ilegal', 'cnpj', 'cnpjs', 'empresa', 'empresas', 'marca', 'marcas', 'produto', 'produtos', 'registro', 'registrado', 'sobre', 'tudo'}
+    palavras_ignoradas = {'para', 'como', 'sabor', 'menta', 'azul', 'blue', 'gold', 'silver', 'black', 'white', 'classic', 'original', 'fresh', 'blend', 'tradicional', 'slim', 'slims', 'premium', 'edition', 'double', 'menthol', 'cherry', 'grape', 'mint', 'qual', 'quais', 'onde', 'esse', 'este', 'esta', 'aqui', 'pode', 'vender', 'legal', 'ilegal', 'cnpj', 'cnpjs', 'empresa', 'empresas', 'marca', 'marcas', 'produto', 'produtos', 'registro', 'registrado', 'sobre', 'tudo'}
+
     # --- FASE 1: BUSCA ATIVA NO BANCO GGTAB (PYTHON) ---
     cnpjs_alvo = set()
     empresas_alvo_ilegais = set()
@@ -770,7 +774,7 @@ def motor_juridico_anvisa_nlp(prompt_usuario):
                 if cnpj in cnpjs_alvo or marca_exibicao.lower() in empresas_alvo_ilegais:
                     chave = cnpj if "Ilegal" not in cnpj else marca_exibicao
                     if chave not in empresas_encontradas:
-                        status_str = "REGISTRADO (Permitido)" if "Ilegal" not in cnpj else "ILEGAL (Clandestino)"
+                        status_str = "✅ REGISTRADO (Permitido)" if "Ilegal" not in cnpj else "❌ ILEGAL (Clandestino)"
                         empresas_encontradas[chave] = {
                             "empresa": empresa_exibicao if "Ilegal" not in cnpj else "Fabricante Clandestino",
                             "cnpj": cnpj,
@@ -782,18 +786,25 @@ def motor_juridico_anvisa_nlp(prompt_usuario):
     contexto_banco_para_ia = ""
     texto_banco_para_tela = ""
     
+    gatilhos_busca = {"marca", "produto", "produtos", "cnpj", "registro", "registrado", "ilegal", "legal", "vender", "vende", "pod", "vape", "cigarro", "essencia"}
+    
     if empresas_encontradas:
         texto_banco_para_tela = "### 🏢 Dossiê Corporativo (Banco GGTAB)\n\n"
         for chave, dados in empresas_encontradas.items():
             texto_banco_para_tela += f"**Origem/Fabricante:** {dados['empresa']}\n**CNPJ:** {dados['cnpj']}\n**Status Global:** {dados['status']}\n**Portfólio:**\n" 
-            texto_banco_para_tela += "\n".join([f"- {p}" for p in dados['produtos'][:10]]) + ("\n- *(...e outros)*\n\n" if len(dados['produtos'])>10 else "\n\n")
+            
+            # Limitando a exibição para não poluir
+            if len(dados['produtos']) > 15:
+                texto_banco_para_tela += "\n".join([f"- {p}" for p in dados['produtos'][:15]]) + f"\n- *(...e outros {len(dados['produtos'])-15} registrados)*\n\n"
+            else:
+                texto_banco_para_tela += "\n".join([f"- {p}" for p in dados['produtos']]) + "\n\n"
             
             contexto_banco_para_ia += f"Empresa: {dados['empresa']}, CNPJ: {dados['cnpj']}, Status: {dados['status']}.\n"
         texto_banco_para_tela += "---\n"
         
-    elif len(numeros_pergunta) >= 11 or any(termo in pergunta for termo in ["cnpj", "empresa", "fabricante"]):
-        texto_banco_para_tela = "### 🔍 Consulta Ativa no Banco\n🚨 **ALERTA VERMELHO:** O CNPJ/Empresa NÃO CONSTA no banco da ANVISA.\n*Diretriz:* Produto CLANDESTINO/ILEGAL. Passível de apreensão.\n\n---\n"
-        contexto_banco_para_ia = "O fiscal consultou um CNPJ/Produto que NÃO EXISTE no banco de dados. Informe que o produto é ilegal por falta de registro (RDC 896)."
+    elif len(numeros_pergunta) >= 11 or gatilhos_busca.intersection(palavras_pergunta):
+        texto_banco_para_tela = "### 🔍 Consulta Ativa no Banco\n🚨 **ALERTA VERMELHO:** O CNPJ/Produto NÃO CONSTA no banco oficial de registrados da ANVISA.\n*Diretriz de Campo:* Produto CLANDESTINO/ILEGAL. Passível de apreensão.\n\n---\n"
+        contexto_banco_para_ia = "O fiscal consultou um CNPJ/Produto que NÃO EXISTE no banco de dados. Informe que o produto é clandestino/ilegal por falta de registro (RDC 896/2024)."
 
     # --- FASE 2: CONEXÃO COM O OLLAMA LOCAL (Llama 3.2) ---
     system_prompt = f"""
@@ -833,9 +844,6 @@ Sua missão: Responda à dúvida do fiscal com base nessas leis e na informaçã
 # ==========================================
 # INICIALIZAÇÃO E SESSÃO
 # ==========================================
-DB_PRODUTOS = obter_banco_atualizado()
-CNPJ_TO_PRODUTO = get_cnpj_mapping()
-
 if 'tentativas_login' not in st.session_state: st.session_state['tentativas_login'] = 0
 if 'autenticado' not in st.session_state: st.session_state['autenticado'] = False 
 if 'nome_fiscal' not in st.session_state: st.session_state['nome_fiscal'] = ""
@@ -970,7 +978,7 @@ def app():
                             cat_limpa = "Tabaco Irregular (Sem Registro + Propaganda)" if is_ambos else ("Tabaco Irregular (Sem Registro)" if is_ilegal else "DEF")
                             
                             st.session_state['loja_ativa']['itens'].append({
-                                "Categoria": cat_limpa, "Tipo": tipo_final.replace("🚬 ", "").replace("🕴️ ", "").replace("🌿 ", "").replace("🌾 ", "").replace("🌬 ", "").replace("🪈 ", ""), 
+                                "Categoria": cat_limpa, "Tipo": tipo_final.replace("🚬 ", "").replace("🕴️ ", "").replace("🌿 ", "").replace("🌾 ", "").replace("🌬️ ", "").replace("🪈 ", ""), 
                                 "Produto": nome_final, "Status": status_final, "CNPJ Identificado": cnpj_final, 
                                 "Quantidade": qtd, "Hora": datetime.now().strftime('%H:%M:%S'),
                                 "Foto 1 Bytes": f1_bytes, "Foto 2 Bytes": f2_bytes
