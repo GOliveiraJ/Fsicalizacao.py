@@ -719,110 +719,131 @@ def gerar_pdf(fisc):
     return bytes(pdf.output())
 
 # ==========================================
-# CÉREBRO DE IA (OLLAMA)
+# NOVO MOTOR DE PESQUISA E NLP (NÍVEL ENTERPRISE OLLAMA)
 # ==========================================
+@st.cache_data
+def compilar_indice_produtos(banco_dados):
+    # Transforma o dicionário aninhado em uma lista de busca super rápida (Flattening)
+    indice = []
+    for categoria, tipos in banco_dados.items():
+        for tipo, produtos in tipos.items():
+            for prod_full, cnpj in produtos.items():
+                match = re.match(r'^(.*?)\s*\((.*?)\)$', prod_full)
+                marca = match.group(1).strip() if match else prod_full.strip()
+                fabricante = match.group(2).strip() if match else "Desconhecido"
+                cnpj_limpo = re.sub(r'\D', '', cnpj)
+                
+                status = "REGISTRADO" if "Ilegal" not in cnpj else "ILEGAL"
+                
+                indice.append({
+                    "categoria_macro": categoria,
+                    "tipo": tipo,
+                    "marca": marca,
+                    "marca_lower": marca.lower(),
+                    "fabricante": fabricante,
+                    "fabricante_lower": fabricante.lower(),
+                    "cnpj_original": cnpj,
+                    "cnpj_limpo": cnpj_limpo,
+                    "status": status,
+                    "nome_completo": prod_full
+                })
+    return indice
+
+def extrator_entidades(prompt, indice):
+    prompt_lower = prompt.lower()
+    
+    # 1. Busca rigorosa de CNPJs via Matemática/Regex
+    cnpjs_encontrados = re.findall(r'\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}|\d{14}', prompt)
+    cnpjs_limpos = [re.sub(r'\D', '', c) for c in cnpjs_encontrados]
+    
+    resultados_exatos = []
+    marcas_processadas = set() # Evitar repetições no Dossiê
+    
+    for item in indice:
+        # Match de CNPJ Exato
+        if item['cnpj_limpo'] in cnpjs_limpos and item['cnpj_limpo'] != "":
+            if item['nome_completo'] not in marcas_processadas:
+                resultados_exatos.append(item)
+                marcas_processadas.add(item['nome_completo'])
+            continue
+            
+        # Match de Marca (Buscando exatamente a palavra, evitando falsos positivos com Regex)
+        if len(item['marca_lower']) >= 3:
+            padrao_marca = r'\b' + re.escape(item['marca_lower']) + r'\b'
+            if re.search(padrao_marca, prompt_lower):
+                if item['nome_completo'] not in marcas_processadas:
+                    resultados_exatos.append(item)
+                    marcas_processadas.add(item['nome_completo'])
+                continue
+        
+        # Match de Fabricante (Buscando a palavra exata)
+        if len(item['fabricante_lower']) >= 4 and item['fabricante_lower'] != "desconhecido":
+            fab_clean = item['fabricante_lower'].replace(" ltda", "").replace(" eireli", "").replace(" s.a", "").strip()
+            if len(fab_clean) >= 4:
+                padrao_fab = r'\b' + re.escape(fab_clean) + r'\b'
+                if re.search(padrao_fab, prompt_lower):
+                    if item['nome_completo'] not in marcas_processadas:
+                        resultados_exatos.append(item)
+                        marcas_processadas.add(item['nome_completo'])
+                        
+    return resultados_exatos
+
 def motor_juridico_anvisa_nlp(prompt_usuario):
     if not HAS_OLLAMA:
-        return "⚠️ A biblioteca 'ollama' não está instalada. Adicione 'ollama' ao requirements.txt e reinicie o aplicativo."
+        return "⚠️ A biblioteca 'ollama' não está instalada. Execute 'pip install ollama' no seu terminal."
         
-    pergunta = prompt_usuario.lower()
+    indice_global = compilar_indice_produtos(DB_PRODUTOS)
+    resultados_banco = extrator_entidades(prompt_usuario, indice_global)
     
-    prompt_limpo = pergunta.replace(".", "").replace("/", "").replace("-", "")
-    numeros_pergunta = re.sub(r'\D', '', prompt_limpo)
-    palavras_pergunta = [p for p in re.findall(r'\b\w+\b', pergunta) if len(p) > 3]
-    
-    palavras_ignoradas = {'para', 'como', 'sabor', 'menta', 'azul', 'blue', 'gold', 'silver', 'black', 'white', 'classic', 'original', 'fresh', 'blend', 'tradicional', 'slim', 'slims', 'premium', 'edition', 'double', 'menthol', 'cherry', 'grape', 'mint', 'qual', 'quais', 'onde', 'esse', 'este', 'esta', 'aqui', 'pode', 'vender', 'legal', 'ilegal', 'cnpj', 'cnpjs', 'empresa', 'empresas', 'marca', 'marcas', 'produto', 'produtos', 'registro', 'registrado', 'sobre', 'tudo'}
-
-    # --- FASE 1: BUSCA ATIVA NO BANCO GGTAB (PYTHON) ---
-    cnpjs_alvo = set()
-    empresas_alvo_ilegais = set()
-    
-    for cat, tipos in DB_PRODUTOS.items():
-        for tipo, produtos in tipos.items():
-            for prod_full, cnpj in produtos.items():
-                cnpj_num = re.sub(r'\D', '', cnpj)
-                match_parenteses = re.match(r'^(.*?)\s*\((.*?)\)$', prod_full)
-                marca = match_parenteses.group(1).strip().lower() if match_parenteses else prod_full.lower()
-                empresa = match_parenteses.group(2).strip().lower() if match_parenteses else ""
-                empresa_limpa = empresa.replace(" ltda", "").replace(" eireli", "").replace(" s.a.", "").replace(" - me", "").replace(".", "").strip()
-
-                is_match = False
-                
-                if len(numeros_pergunta) >= 8 and cnpj_num and (numeros_pergunta in cnpj_num or cnpj_num in numeros_pergunta):
-                    is_match = True
-                else:
-                    for p in palavras_pergunta:
-                        if p not in palavras_ignoradas:
-                            if p in marca.split() or (empresa_limpa and p in empresa_limpa.split()):
-                                is_match = True
-                                break
-                                
-                if is_match:
-                    if "Ilegal" not in cnpj:
-                        cnpjs_alvo.add(cnpj)
-                    else:
-                        empresas_alvo_ilegais.add(marca)
-
-    empresas_encontradas = {}
-    for cat, tipos in DB_PRODUTOS.items():
-        for tipo, produtos in tipos.items():
-            for prod_full, cnpj in produtos.items():
-                match_parenteses = re.match(r'^(.*?)\s*\((.*?)\)$', prod_full)
-                marca_exibicao = match_parenteses.group(1).strip() if match_parenteses else prod_full
-                empresa_exibicao = match_parenteses.group(2).strip() if match_parenteses else "Marca Independente"
-                
-                if cnpj in cnpjs_alvo or marca_exibicao.lower() in empresas_alvo_ilegais:
-                    chave = cnpj if "Ilegal" not in cnpj else marca_exibicao
-                    if chave not in empresas_encontradas:
-                        status_str = "✅ REGISTRADO (Permitido)" if "Ilegal" not in cnpj else "❌ ILEGAL (Clandestino)"
-                        empresas_encontradas[chave] = {
-                            "empresa": empresa_exibicao if "Ilegal" not in cnpj else "Fabricante Clandestino",
-                            "cnpj": cnpj,
-                            "status": status_str,
-                            "produtos": []
-                        }
-                    empresas_encontradas[chave]["produtos"].append(f"{marca_exibicao} ({tipo})")
-
-    contexto_banco_para_ia = ""
     texto_banco_para_tela = ""
+    contexto_banco_para_ia = ""
     
-    gatilhos_busca = {"marca", "produto", "produtos", "cnpj", "registro", "registrado", "ilegal", "legal", "vender", "vende", "pod", "vape", "cigarro", "essencia"}
-    
-    if empresas_encontradas:
+    # Montando o Dossiê Agrupado
+    if resultados_banco:
+        empresas_agrupadas = {}
+        for res in resultados_banco:
+            chave_empresa = res['fabricante'] if res['status'] == "REGISTRADO" else res['marca']
+            if chave_empresa not in empresas_agrupadas:
+                empresas_agrupadas[chave_empresa] = {
+                    "cnpj": res['cnpj_original'],
+                    "status": res['status'],
+                    "produtos": []
+                }
+            empresas_agrupadas[chave_empresa]["produtos"].append(f"- **{res['marca']}** ({res['tipo']})")
+            
         texto_banco_para_tela = "### 🏢 Dossiê Corporativo (Banco GGTAB)\n\n"
-        for chave, dados in empresas_encontradas.items():
-            texto_banco_para_tela += f"**Origem/Fabricante:** {dados['empresa']}\n**CNPJ:** {dados['cnpj']}\n**Status Global:** {dados['status']}\n**Portfólio:**\n" 
+        for emp, dados in empresas_agrupadas.items():
+            texto_banco_para_tela += f"**Origem/Fabricante:** {emp}\n**CNPJ Vinculado:** {dados['cnpj']}\n**Status Global:** {'✅ REGISTRADO' if dados['status'] == 'REGISTRADO' else '❌ ILEGAL/CLANDESTINO'}\n**Portfólio Encontrado:**\n"
             
-            # Limitando a exibição para não poluir
             if len(dados['produtos']) > 15:
-                texto_banco_para_tela += "\n".join([f"- {p}" for p in dados['produtos'][:15]]) + f"\n- *(...e outros {len(dados['produtos'])-15} registrados)*\n\n"
+                texto_banco_para_tela += "\n".join(dados['produtos'][:15]) + f"\n- *(... e mais {len(dados['produtos']) - 15} produtos registrados)*\n\n"
             else:
-                texto_banco_para_tela += "\n".join([f"- {p}" for p in dados['produtos']]) + "\n\n"
-            
-            contexto_banco_para_ia += f"Empresa: {dados['empresa']}, CNPJ: {dados['cnpj']}, Status: {dados['status']}.\n"
+                texto_banco_para_tela += "\n".join(dados['produtos']) + "\n\n"
+                
+            contexto_banco_para_ia += f"Empresa/Marca: {emp}, CNPJ: {dados['cnpj']}, Status: {dados['status']}.\n"
         texto_banco_para_tela += "---\n"
         
-    elif len(numeros_pergunta) >= 11 or gatilhos_busca.intersection(palavras_pergunta):
-        texto_banco_para_tela = "### 🔍 Consulta Ativa no Banco\n🚨 **ALERTA VERMELHO:** O CNPJ/Produto NÃO CONSTA no banco oficial de registrados da ANVISA.\n*Diretriz de Campo:* Produto CLANDESTINO/ILEGAL. Passível de apreensão.\n\n---\n"
-        contexto_banco_para_ia = "O fiscal consultou um CNPJ/Produto que NÃO EXISTE no banco de dados. Informe que o produto é clandestino/ilegal por falta de registro (RDC 896/2024)."
+    # Se ele digitou um CNPJ mas o sistema não achou no banco
+    elif re.search(r'\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[\/\s]?\d{4}[-\s]?\d{2}', prompt_usuario):
+        texto_banco_para_tela = "### 🔍 Consulta Ativa no Banco\n🚨 **ALERTA VERMELHO:** O CNPJ pesquisado NÃO CONSTA no banco da ANVISA.\n*Diretriz:* Produto CLANDESTINO/ILEGAL. Passível de apreensão.\n\n---\n"
+        contexto_banco_para_ia = "O fiscal consultou um CNPJ que NÃO EXISTE no banco de dados oficial. O produto é ilegal e clandestino (RDC 896/2024)."
 
-    # --- FASE 2: CONEXÃO COM O OLLAMA LOCAL (Llama 3.2) ---
+    # --- FASE 3: CONEXÃO COM O OLLAMA LOCAL (Llama 3.2) ---
     system_prompt = f"""
-Você é o Assistente Jurídico Especialista da GGTAB (ANVISA).
-Responda de forma curta, direta e profissional. Use formatação em Markdown (negrito para as leis).
+Você é o Procurador Jurídico Especialista da GGTAB (ANVISA).
+Sua função é orientar fiscais sanitários em campo com fundamentação legal precisa.
 
-Suas leis base:
-1. RDC 855/2024: Proíbe totalmente Dispositivos Eletrônicos para Fumar (DEF/Vapes/Pods/Juices).
-2. RDC 840/2023: Proíbe qualquer propaganda de cigarros (cartazes, luminosos, internet).
-3. RDC 896/2024: Exige registro na ANVISA para comercializar tabaco. Contrabando/Paraguai não tem registro.
-4. RDC 838/2023: Exige advertências sanitárias em português nas embalagens.
-5. Lei 6.437/1977: Define as multas (R$2.000 a R$1.500.000) e apreensões.
-6. Lei 9.294/1996 (Lei Antifumo): Proíbe uso em local fechado e reitera proibição de propaganda.
+Legislação de referência:
+1. RDC nº 855/2024: Proíbe fabricação, comercialização e propaganda de Dispositivos Eletrônicos para Fumar (DEF/Vapes/Pods/Juices).
+2. RDC nº 840/2023 e Lei nº 9.294/1996: Vedam propaganda comercial de fumígenos (internet, neon, cartazes).
+3. RDC nº 896/2024: Exige registro na ANVISA para tabaco. Produtos sem registro ou do Paraguai são ilegais.
+4. RDC nº 838/2023: Exige advertências com imagens de saúde em português nas embalagens.
+5. Lei nº 6.437/1977: Define as penalidades (apreensão, interdição e multas de R$2 mil a R$1,5 milhão).
 
-Informação do Banco de Dados recuperada para esta pergunta:
-[{contexto_banco_para_ia if contexto_banco_para_ia else "Nenhuma consulta específica ao banco identificada."}]
+Informação do Banco de Dados recuperada para a pergunta do fiscal:
+[{contexto_banco_para_ia if contexto_banco_para_ia else "O fiscal fez uma pergunta jurídica genérica sem citar marcas do banco."}]
 
-Sua missão: Responda à dúvida do fiscal com base nessas leis e na informação do banco.
+Sua missão: Responda à dúvida do fiscal. Seja curto, direto e não crie leis que não existam. Use Markdown.
 """
 
     try:
@@ -837,7 +858,7 @@ Sua missão: Responda à dúvida do fiscal com base nessas leis e na informaçã
         resposta_final_ia = "### ⚖️ Parecer do Motor Jurídico (Ollama):\n\n" + resposta_ollama['message']['content']
         
     except Exception as e:
-        resposta_final_ia = f"⚠️ Erro ao conectar com o Ollama Local: {e}. Verifique se o aplicativo Ollama está rodando no terminal com o comando 'ollama run llama3.2'."
+        resposta_final_ia = f"⚠️ Erro ao conectar com o Ollama Local: {e}. Verifique se o aplicativo Ollama está aberto e se rodou 'ollama run llama3.2' no terminal."
 
     return texto_banco_para_tela + resposta_final_ia
 
@@ -851,7 +872,7 @@ if 'historico_operacoes' not in st.session_state: st.session_state['historico_op
 if 'fisc_ativa' not in st.session_state: st.session_state['fisc_ativa'] = None
 if 'loja_ativa' not in st.session_state: st.session_state['loja_ativa'] = None
 if 'chat_ia' not in st.session_state: 
-    st.session_state['chat_ia'] = [{"role": "assistant", "content": "Olá! Sou o **Motor Jurídico Híbrido da ANVISA (Ollama)**. 🇧🇷 \n\nPossuo conhecimento jurídico integrado e rastreio automático no Banco de Produtos GGTAB.\n\nExperimente perguntar:\n- *'A marca Ignite é legal?'*\n- *'Cigarro San Marino é legal?'*\n- *'Quais os produtos do CNPJ 33.009.911/0001-39?'*\n- *'Achei produto escondido no caixa, qual a multa?'*"}]
+    st.session_state['chat_ia'] = [{"role": "assistant", "content": "Olá! Sou o **Motor Jurídico Híbrido da ANVISA (Ollama)**. 🇧🇷 \n\nPossuo conhecimento jurídico integrado e rastreio avançado de CNPJs no Banco de Produtos GGTAB.\n\nExperimente perguntar:\n- *'O Pod Ignite tem registro?'*\n- *'Quais os produtos da Souza Cruz?'*\n- *'O CNPJ 12.345.678/0001-95 está regular?'*\n- *'Achei produto escondido no caixa, qual a multa?'*"}]
 
 def tela_login():
     st.title("🛡️ Portal de Fiscalização GGTAB")
